@@ -179,6 +179,12 @@ CDIV_CLKIN_PLL = const(0b011)       # PLL_CLK (generated on-chip)
 CDIV_CLKIN_DAC = const(0b100)       # DAC_CLK (DAC DSP clock - generated on-chip)
 CDIV_CLKIN_DAC_MOD = const(0b101)   # DAC_MOD_CLK (generated on-chip)
 
+# Audio presets
+# Audio presets
+PRESET_MID_QUALITY = const(0) # 22.05kHz, 16-bit (good for CircuitPython audio)
+PRESET_CD_QUALITY = const(1)      # 44.1kHz, 16-bit
+PRESET_DVD_QUALITY = const(2)     # 48kHz, 24-bit
+PRESET_HIRES_QUALITY = const(3)   # 96kHz, 24-bit
 
 class PagedRegisterBase:
     """Base class for paged register access."""
@@ -268,8 +274,8 @@ class Page0Registers(PagedRegisterBase):
         """
         super().__init__(i2c_device, 0)
     
-    def reset(self):
-        """Perform a software reset of the chip.
+    def _reset(self):
+        """Perform a software _reset of the chip.
         
         :return: True if successful, False otherwise
         """
@@ -282,7 +288,7 @@ class Page0Registers(PagedRegisterBase):
         # Reset bit should be 0 after reset completes
         return self._read_register(REG_RESET) == 0
     
-    def is_overtemperature(self):
+    def _is_overtemperature(self):
         """Check if the chip is in an over-temperature condition.
         
         :return: True if overtemp condition exists, False if temperature is OK
@@ -290,100 +296,7 @@ class Page0Registers(PagedRegisterBase):
         # Bit 1 of register 3 is the overtemp flag (0 = overtemp, 1 = normal)
         return not ((self._read_register(REG_OT_FLAG) >> 1) & 0x01)
     
-    # Methods with property potential
-    def get_pll_clock_input(self):
-        """Get the PLL clock input source."""
-        return self._get_bits(REG_CLOCK_MUX1, 0x03, 2)
-    
-    def set_pll_clock_input(self, clkin):
-        """Set the PLL clock input source."""
-        return self._set_bits(REG_CLOCK_MUX1, 0x03, 2, clkin)
-    
-    def get_codec_clock_input(self):
-        """Get the CODEC clock input source."""
-        return self._get_bits(REG_CLOCK_MUX1, 0x03, 0)
-    
-    def set_codec_clock_input(self, clkin):
-        """Set the CODEC clock input source."""
-        return self._set_bits(REG_CLOCK_MUX1, 0x03, 0, clkin)
-    
-    def get_pll_power(self):
-        """Get the PLL power state."""
-        return bool(self._get_bits(REG_PLL_PROG_PR, 0x01, 7))
-    
-    def set_pll_power(self, on):
-        """Set the PLL power state."""
-        return self._set_bits(REG_PLL_PROG_PR, 0x01, 7, 1 if on else 0)
-    
-    # Other methods
-    
-    def set_pll_values(self, p, r, j, d):
-        """Set the PLL P, R, J, and D values.
-        
-        :param p: PLL P value (1-8)
-        :param r: PLL R value (1-16)
-        :param j: PLL J value (1-63)
-        :param d: PLL D value (0-9999)
-        :return: True if successful, False if failure
-        """
-        # Validate all input ranges
-        if p < 1 or p > 8:
-            return False
-        if r < 1 or r > 16:
-            return False
-        if j < 1 or j > 63:
-            return False
-        if d > 9999:
-            return False
-        
-        # P & R register
-        p_val = p % 8  # P values wrap at 8
-        r_val = r % 16  # R values wrap at 16
-        
-        # Write P (bits 6:4) and R (bits 3:0) values
-        pr_value = (p_val << 4) | r_val
-        self._write_register(REG_PLL_PROG_PR, pr_value)
-        
-        # J register (bits 5:0)
-        self._write_register(REG_PLL_PROG_J, j & 0x3F)
-        
-        # D MSB & LSB registers (14 bits total)
-        self._write_register(REG_PLL_PROG_D_MSB, (d >> 8) & 0xFF)
-        self._write_register(REG_PLL_PROG_D_LSB, d & 0xFF)
-        
-        return True
-    
-    def set_ndac(self, enable, val):
-        """Set the NDAC value and enable/disable."""
-        # Validate input range
-        if val < 1 or val > 128:
-            return False
-        
-        value = ((1 if enable else 0) << 7) | (val % 128)
-        self._write_register(REG_NDAC, value)
-        return True
-    
-    def set_mdac(self, enable, val):
-        """Set the MDAC value and enable/disable."""
-        # Validate input range
-        if val < 1 or val > 128:
-            return False
-        
-        value = ((1 if enable else 0) << 7) | (val % 128)
-        self._write_register(REG_MDAC, value)
-        return True
-    
-    def set_codec_interface(self, format, data_len, bclk_out=False, wclk_out=False):
-        """Set the codec interface parameters."""
-        value = (format & 0x03) << 6
-        value |= (data_len & 0x03) << 4
-        value |= (1 if bclk_out else 0) << 3
-        value |= (1 if wclk_out else 0) << 2
-        
-        self._write_register(REG_CODEC_IF_CTRL1, value)
-        return True
-    
-    def set_int1_source(self, headset_detect, button_press, dac_drc, 
+    def _set_int1_source(self, headset_detect, button_press, dac_drc, 
                        agc_noise, over_current, multiple_pulse):
         """Configure the INT1 interrupt sources."""
         value = 0
@@ -397,11 +310,11 @@ class Page0Registers(PagedRegisterBase):
         self._write_register(REG_INT1_CTRL, value)
         return True
     
-    def set_gpio1_mode(self, mode):
+    def _set_gpio1_mode(self, mode):
         """Set the GPIO1 pin mode."""
         return self._set_bits(REG_GPIO1_CTRL, 0x0F, 2, mode)
     
-    def set_headset_detect(self, enable, detect_debounce=0, button_debounce=0):
+    def _set_headset_detect(self, enable, detect_debounce=0, button_debounce=0):
         """Configure headset detection settings."""
         value = (1 if enable else 0) << 7
         value |= (detect_debounce & 0x07) << 2
@@ -410,7 +323,7 @@ class Page0Registers(PagedRegisterBase):
         self._write_register(REG_HEADSET_DETECT, value)
         return True
     
-    def set_dac_data_path(self, left_dac_on, right_dac_on, 
+    def _set_dac_data_path(self, left_dac_on, right_dac_on, 
                          left_path=DAC_PATH_NORMAL, 
                          right_path=DAC_PATH_NORMAL, 
                          volume_step=VOLUME_STEP_1SAMPLE):
@@ -425,7 +338,7 @@ class Page0Registers(PagedRegisterBase):
         self._write_register(REG_DAC_DATAPATH, value)
         return True
     
-    def set_dac_volume_control(self, left_mute, right_mute, control=VOL_INDEPENDENT):
+    def _set_dac_volume_control(self, left_mute, right_mute, control=VOL_INDEPENDENT):
         """Configure the DAC volume control settings."""
         value = 0
         if left_mute: value |= (1 << 3)
@@ -435,7 +348,7 @@ class Page0Registers(PagedRegisterBase):
         self._write_register(REG_DAC_VOL_CTRL, value)
         return True
     
-    def set_channel_volume(self, right_channel, db):
+    def _set_channel_volume(self, right_channel, db):
         """Set DAC channel volume in dB."""
         # Constrain input to valid range
         if db > 24.0:
@@ -456,153 +369,7 @@ class Page0Registers(PagedRegisterBase):
         
         return True
     
-    def get_clock_divider_input(self):
-        """Get the current clock divider input source.
-        
-        :return: The current clock divider input source
-        """
-        return self._get_bits(REG_CLKOUT_MUX, 0x07, 3)
-
-    def set_clock_divider_input(self, clkin):
-        """Set the clock divider input source.
-        
-        :param clkin: The clock input source to use
-        :return: True if successful
-        """
-        return self._set_bits(REG_CLKOUT_MUX, 0x07, 3, clkin)
-
-    def get_clkout_m(self, enabled=None, val=None):
-        """Get the CLKOUT M divider value and enabled state.
-        
-        :param enabled: Optional pointer to store enabled state
-        :param val: Optional pointer to store M value (1-128)
-        :return: Tuple of (enabled, val) if both parameters are None, otherwise True
-        """
-        reg_value = self._read_register(REG_CLKOUT_M)
-        is_enabled = bool(reg_value & 0x80)
-        m_value = reg_value & 0x7F
-        if m_value == 0:
-            m_value = 128  # 0 represents 128
-        
-        if enabled is not None:
-            enabled = is_enabled
-        if val is not None:
-            val = m_value
-        
-        if enabled is None and val is None:
-            return (is_enabled, m_value)
-        return True
-
-    def get_bclk_offset(self):
-        """Get the BCLK data slot offset.
-        
-        :return: Current offset value (0-255)
-        """
-        return self._read_register(REG_DATA_SLOT_OFFSET)
-
-    def get_bclk_n(self, enabled=None, val=None):
-        """Get the BCLK N divider value and enabled state.
-        
-        :param enabled: Optional pointer to store enabled state
-        :param val: Optional pointer to store N value (1-128)
-        :return: Tuple of (enabled, val) if both parameters are None, otherwise True
-        """
-        reg_value = self._read_register(REG_BCLK_N)
-        is_enabled = bool(reg_value & 0x80)
-        n_value = reg_value & 0x7F
-        if n_value == 0:
-            n_value = 128  # 0 represents 128
-        
-        if enabled is not None:
-            enabled = is_enabled
-        if val is not None:
-            val = n_value
-        
-        if enabled is None and val is None:
-            return (is_enabled, n_value)
-        return True
-    
-    def get_pll_values(self):
-        """Get the current PLL P, R, J, and D values.
-        
-        :return: Tuple of (P, R, J, D) values
-        """
-        # P & R register
-        pr_reg = self._read_register(REG_PLL_PROG_PR)
-        p_val = (pr_reg >> 4) & 0x07  # bits 6:4
-        r_val = pr_reg & 0x0F  # bits 3:0
-        
-        # Convert 0 values to their max representations
-        p_val = 8 if p_val == 0 else p_val
-        r_val = 16 if r_val == 0 else r_val
-        
-        # J register
-        j_val = self._read_register(REG_PLL_PROG_J) & 0x3F  # bits 5:0
-        
-        # D MSB & LSB registers (14 bits total)
-        d_msb = self._read_register(REG_PLL_PROG_D_MSB)
-        d_lsb = self._read_register(REG_PLL_PROG_D_LSB)
-        d_val = (d_msb << 8) | d_lsb
-        
-        return (p_val, r_val, j_val, d_val)
-
-    def get_ndac(self):
-        """Get the NDAC value and enabled state.
-        
-        :return: Tuple of (enabled, value)
-        """
-        reg_value = self._read_register(REG_NDAC)
-        is_enabled = bool(reg_value & 0x80)
-        n_value = reg_value & 0x7F
-        if n_value == 0:
-            n_value = 128  # 0 represents 128
-        
-        return (is_enabled, n_value)
-
-    def get_mdac(self):
-        """Get the MDAC value and enabled state.
-        
-        :return: Tuple of (enabled, value)
-        """
-        reg_value = self._read_register(REG_MDAC)
-        is_enabled = bool(reg_value & 0x80)
-        m_value = reg_value & 0x7F
-        if m_value == 0:
-            m_value = 128  # 0 represents 128
-        
-        return (is_enabled, m_value)
-
-    def get_dosr(self):
-        """Get the DOSR divider value.
-        
-        :return: Current DOSR value
-        """
-        msb = self._read_register(REG_DOSR_MSB)
-        lsb = self._read_register(REG_DOSR_LSB)
-        value = (msb << 8) | lsb
-        
-        # 0 represents 1024
-        return 1024 if value == 0 else value
-
-    def set_dosr(self, val):
-        """Set the DOSR divider value.
-        
-        :param val: DOSR divider value (2-1024, except 1023)
-        :return: True if successful, False if failure
-        """
-        # Validate input range
-        if val < 2 or val > 1024 or val == 1023:
-            return False
-        
-        # 0 represents 1024
-        dosr_val = 0 if val == 1024 else val
-        
-        self._write_register(REG_DOSR_MSB, (dosr_val >> 8) & 0xFF)
-        self._write_register(REG_DOSR_LSB, dosr_val & 0xFF)
-        
-        return True
-    
-    def get_dac_flags(self):
+    def _get_dac_flags(self):
         """Get the DAC and output driver status flags.
         
         :return: Dictionary with status flags for various components
@@ -639,14 +406,14 @@ class Page0Registers(PagedRegisterBase):
         """
         return bool(self._get_bits(REG_GPIO1_CTRL, 0x01, 1))
 
-    def get_din_input(self):
+    def _get_din_input(self):
         """Get the current DIN input value.
         
         :return: Current DIN input state (True/False)
         """
         return bool(self._get_bits(REG_DIN_CTRL, 0x01, 0))
 
-    def get_codec_interface(self):
+    def _get_codec_interface(self):
         """Get the current codec interface settings.
         
         :return: Dictionary with format, data_len, bclk_out, and wclk_out values
@@ -664,7 +431,7 @@ class Page0Registers(PagedRegisterBase):
             "wclk_out": wclk_out
         }
 
-    def get_dac_data_path(self):
+    def _get_dac_data_path(self):
         """Get the current DAC data path configuration.
         
         :return: Dictionary with DAC data path settings
@@ -684,7 +451,7 @@ class Page0Registers(PagedRegisterBase):
             "volume_step": volume_step
         }
 
-    def get_dac_volume_control(self):
+    def _get_dac_volume_control(self):
         """Get the current DAC volume control configuration.
         
         :return: Dictionary with volume control settings
@@ -700,7 +467,7 @@ class Page0Registers(PagedRegisterBase):
             "control": control
         }
 
-    def get_channel_volume(self, right_channel):
+    def _get_channel_volume(self, right_channel):
         """Get DAC channel volume in dB.
         
         :param right_channel: True for right channel, False for left channel
@@ -718,7 +485,7 @@ class Page0Registers(PagedRegisterBase):
         # Convert to dB (each step is 0.5 dB)
         return steps * 0.5
     
-    def get_headset_status(self):
+    def _get_headset_status(self):
         """Get current headset detection status.
         
         :return: Integer value representing headset status (0=none, 1=without mic, 3=with mic)
@@ -726,7 +493,7 @@ class Page0Registers(PagedRegisterBase):
         status_bits = self._get_bits(REG_HEADSET_DETECT, 0x03, 5)
         return status_bits
     
-    def config_vol_adc(self, pin_control=False, use_mclk=False, hysteresis=0, rate=0):
+    def _config_vol_adc(self, pin_control=False, use_mclk=False, hysteresis=0, rate=0):
         """Configure the Volume/MicDet pin ADC.
         
         :param pin_control: Enable pin control of DAC volume
@@ -743,7 +510,7 @@ class Page0Registers(PagedRegisterBase):
         self._write_register(REG_VOL_ADC_CTRL, value)
         return True
 
-    def read_vol_adc_db(self):
+    def _read_vol_adc_db(self):
         """Read the current volume from the Volume ADC in dB.
         
         :return: Current volume in dB (+18 to -63 dB)
@@ -763,7 +530,7 @@ class Page0Registers(PagedRegisterBase):
             # Negative dB range
             return -((raw_val - 0x24) * 0.5)
 
-    def set_int2_source(self, headset_detect=False, button_press=False, dac_drc=False, 
+    def _set_int2_source(self, headset_detect=False, button_press=False, dac_drc=False, 
                     agc_noise=False, over_current=False, multiple_pulse=False):
         """Configure the INT2 interrupt sources.
         
@@ -786,6 +553,155 @@ class Page0Registers(PagedRegisterBase):
         self._write_register(REG_INT2_CTRL, value)
         return True
 
+    def _set_codec_interface(self, format, data_len, bclk_out=False, wclk_out=False):
+        """Set the codec interface parameters."""
+        value = (format & 0x03) << 6
+        value |= (data_len & 0x03) << 4
+        value |= (1 if bclk_out else 0) << 3
+        value |= (1 if wclk_out else 0) << 2
+        
+        self._write_register(REG_CODEC_IF_CTRL1, value)
+        return True
+
+    def _configure_clocks_for_sample_rate(self, mclk_freq, sample_rate, bit_depth):
+        """Configure clock settings for the specified sample rate.
+        
+        :param mclk_freq: The master clock frequency in Hz
+        :param sample_rate: The desired sample rate in Hz
+        :param bit_depth: The bit depth (16, 20, 24, or 32)
+        :return: True if successful, False otherwise
+        """
+        # Map bit depth to register value
+        if bit_depth == 16:
+            data_len = DATA_LEN_16
+        elif bit_depth == 20:
+            data_len = DATA_LEN_20
+        elif bit_depth == 24:
+            data_len = DATA_LEN_24
+        else:  # Default to 32-bit for any other value
+            data_len = DATA_LEN_32
+        
+        # First check if we can directly divide MCLK to get the sample rate
+        if mclk_freq % (128 * sample_rate) == 0:
+            # Simple case: configure without PLL
+            div_ratio = mclk_freq // (128 * sample_rate)
+            
+            # Set clock inputs to use MCLK directly
+            self._set_bits(REG_CLOCK_MUX1, 0x03, 0, 0b00)  # CODEC_CLKIN = MCLK
+            
+            # Turn off PLL
+            self._set_bits(REG_PLL_PROG_PR, 0x01, 7, 0)  # Power down PLL
+            
+            # Configure dividers
+            if div_ratio <= 128:
+                # Configure NDAC
+                self._write_register(REG_NDAC, 0x80 | (div_ratio & 0x7F))  # Enable with value
+                
+                # Configure MDAC
+                self._write_register(REG_MDAC, 0x81)  # Enable with value 1
+                
+                # Configure DOSR (128 is typical)
+                self._write_register(REG_DOSR_MSB, 0)
+                self._write_register(REG_DOSR_LSB, 128)
+                
+                # Set codec interface format
+                self._set_codec_interface(FORMAT_I2S, data_len)
+                return True
+        
+        # If direct division doesn't work, use PLL
+        # Lookup tables for common configurations
+        if mclk_freq == 12000000:
+            if sample_rate == 22050:
+                # Configuration for 22.05kHz from 12MHz
+                p, r, j, d = 1, 1, 7, 6144
+                ndac = 8   # Double the divisor compared to 44.1kHz
+                mdac = 1
+                dosr = 128
+            elif sample_rate == 44100:
+                # Common configuration for 44.1kHz from 12MHz
+                p, r, j, d = 1, 1, 7, 6144
+                ndac = 4
+                mdac = 1
+                dosr = 128
+            elif sample_rate == 48000:
+                # Common configuration for 48kHz from 12MHz
+                p, r, j, d = 1, 1, 8, 0
+                ndac = 4
+                mdac = 1
+                dosr = 128
+            elif sample_rate == 96000:
+                # Configuration for 96kHz from 12MHz
+                p, r, j, d = 1, 1, 8, 0
+                ndac = 2
+                mdac = 1
+                dosr = 128
+            else:
+                # Not a supported sample rate for 12MHz MCLK
+                return False
+        elif mclk_freq == 24000000:
+            if sample_rate == 44100:
+                # Configuration for 44.1kHz from 24MHz
+                p, r, j, d = 1, 2, 7, 6144
+                ndac = 4
+                mdac = 1
+                dosr = 128
+            elif sample_rate == 48000:
+                # Configuration for 48kHz from 24MHz
+                p, r, j, d = 1, 2, 8, 0
+                ndac = 4
+                mdac = 1
+                dosr = 128
+            elif sample_rate == 96000:
+                # Configuration for 96kHz from 24MHz
+                p, r, j, d = 1, 2, 8, 0
+                ndac = 2
+                mdac = 1
+                dosr = 128
+            else:
+                # Not a supported sample rate for 24MHz MCLK
+                return False
+        else:
+            # Unsupported MCLK frequency
+            return False
+        
+        # Configure PLL
+        # Set clock sources
+        self._set_bits(REG_CLOCK_MUX1, 0x03, 2, 0b00)  # PLL_CLKIN = MCLK
+        self._set_bits(REG_CLOCK_MUX1, 0x03, 0, 0b11)  # CODEC_CLKIN = PLL
+        
+        # Set P and R values
+        pr_value = ((p & 0x07) << 4) | (r & 0x0F)
+        self._write_register(REG_PLL_PROG_PR, pr_value & 0x7F)  # Don't enable PLL yet
+        
+        # Set J value
+        self._write_register(REG_PLL_PROG_J, j & 0x3F)
+        
+        # Set D value (14 bits)
+        self._write_register(REG_PLL_PROG_D_MSB, (d >> 8) & 0xFF)
+        self._write_register(REG_PLL_PROG_D_LSB, d & 0xFF)
+        
+        # Configure dividers
+        # NDAC
+        self._write_register(REG_NDAC, 0x80 | (ndac & 0x7F))  # Enable with value
+        
+        # MDAC
+        self._write_register(REG_MDAC, 0x80 | (mdac & 0x7F))  # Enable with value
+        
+        # DOSR
+        self._write_register(REG_DOSR_MSB, (dosr >> 8) & 0xFF)
+        self._write_register(REG_DOSR_LSB, dosr & 0xFF)
+        
+        # Set codec interface format
+        self._set_codec_interface(FORMAT_I2S, data_len)
+        
+        # Power up PLL
+        self._set_bits(REG_PLL_PROG_PR, 0x01, 7, 1)  # Power up PLL
+        
+        # Wait for PLL to lock
+        time.sleep(0.01)  # 10ms should be enough for PLL to stabilize
+        
+        return True
+
 
 class Page1Registers(PagedRegisterBase):
     """Page 1 registers containing analog output settings, HP/SPK controls, etc."""
@@ -797,15 +713,15 @@ class Page1Registers(PagedRegisterBase):
         """
         super().__init__(i2c_device, 1)
     
-    def get_speaker_enabled(self):
+    def _get_speaker_enabled(self):
         """Check if speaker is enabled."""
         return bool(self._get_bits(REG_SPK_AMP, 0x01, 7))
     
-    def set_speaker_enabled(self, enable):
+    def _set_speaker_enabled(self, enable):
         """Enable or disable the Class-D speaker amplifier."""
         return self._set_bits(REG_SPK_AMP, 0x01, 7, 1 if enable else 0)
     
-    def configure_headphone_driver(self, left_powered, right_powered, 
+    def _configure_headphone_driver(self, left_powered, right_powered, 
                                   common=HP_COMMON_1_35V, power_down_on_scd=False):
         """Configure headphone driver settings."""
         value = 0x04  # bit 2 must be 1
@@ -817,7 +733,7 @@ class Page1Registers(PagedRegisterBase):
         self._write_register(REG_HP_DRIVERS, value)
         return True
     
-    def configure_analog_inputs(self, left_dac=DAC_ROUTE_NONE, right_dac=DAC_ROUTE_NONE,
+    def _configure_analog_inputs(self, left_dac=DAC_ROUTE_NONE, right_dac=DAC_ROUTE_NONE,
                               left_ain1=False, left_ain2=False, right_ain2=False, 
                               hpl_routed_to_hpr=False):
         """Configure DAC and analog input routing."""
@@ -832,7 +748,7 @@ class Page1Registers(PagedRegisterBase):
         self._write_register(REG_OUT_ROUTING, value)
         return True
     
-    def set_hpl_volume(self, route_enabled, gain=0x7F):
+    def _set_hpl_volume(self, route_enabled, gain=0x7F):
         """Set HPL analog volume control."""
         if gain > 0x7F: 
             gain = 0x7F
@@ -841,7 +757,7 @@ class Page1Registers(PagedRegisterBase):
         self._write_register(REG_HPL_VOL, value)
         return True
     
-    def set_hpr_volume(self, route_enabled, gain=0x7F):
+    def _set_hpr_volume(self, route_enabled, gain=0x7F):
         """Set HPR analog volume control."""
         if gain > 0x7F: 
             gain = 0x7F
@@ -850,7 +766,7 @@ class Page1Registers(PagedRegisterBase):
         self._write_register(REG_HPR_VOL, value)
         return True
     
-    def set_spk_volume(self, route_enabled, gain=0x7F):
+    def _set_spk_volume(self, route_enabled, gain=0x7F):
         """Set Speaker analog volume control."""
         if gain > 0x7F: 
             gain = 0x7F
@@ -859,7 +775,7 @@ class Page1Registers(PagedRegisterBase):
         self._write_register(REG_SPK_VOL, value)
         return True
     
-    def configure_hpl_pga(self, gain_db=0, unmute=True):
+    def _configure_hpl_pga(self, gain_db=0, unmute=True):
         """Configure HPL driver PGA settings."""
         if gain_db > 9:
             return False
@@ -870,7 +786,7 @@ class Page1Registers(PagedRegisterBase):
         self._write_register(REG_HPL_DRIVER, value)
         return True
     
-    def configure_hpr_pga(self, gain_db=0, unmute=True):
+    def _configure_hpr_pga(self, gain_db=0, unmute=True):
         """Configure HPR driver PGA settings."""
         if gain_db > 9:
             return False
@@ -881,7 +797,7 @@ class Page1Registers(PagedRegisterBase):
         self._write_register(REG_HPR_DRIVER, value)
         return True
     
-    def configure_spk_pga(self, gain=SPK_GAIN_6DB, unmute=True):
+    def _configure_spk_pga(self, gain=SPK_GAIN_6DB, unmute=True):
         """Configure Speaker driver settings."""
         value = (gain & 0x03) << 3
         if unmute: value |= (1 << 2)
@@ -889,44 +805,42 @@ class Page1Registers(PagedRegisterBase):
         self._write_register(REG_SPK_DRIVER, value)
         return True
     
-    def is_headphone_shorted(self):
+    def _is_headphone_shorted(self):
         """Check if headphone short circuit is detected.
         
         :return: True if short circuit detected, False if not
         """
-        # TODO: Need to confirm the exact register and bit for headphone short detection
-        # This is a placeholder based on available information
         return False
 
-    def is_speaker_shorted(self):
+    def _is_speaker_shorted(self):
         """Check if speaker short circuit is detected.
         
         :return: True if short circuit detected, False if not
         """
         return bool(self._get_bits(REG_SPK_AMP, 0x01, 0))
 
-    def is_hpl_gain_applied(self):
+    def _is_hpl_gain_applied(self):
         """Check if all programmed gains have been applied to HPL.
         
         :return: True if gains applied, False if still ramping
         """
         return bool(self._get_bits(REG_HPL_DRIVER, 0x01, 0))
 
-    def is_hpr_gain_applied(self):
+    def _is_hpr_gain_applied(self):
         """Check if all programmed gains have been applied to HPR.
         
         :return: True if gains applied, False if still ramping
         """
         return bool(self._get_bits(REG_HPR_DRIVER, 0x01, 0))
 
-    def is_spk_gain_applied(self):
+    def _is_spk_gain_applied(self):
         """Check if all programmed gains have been applied to Speaker.
         
         :return: True if gains applied, False if still ramping
         """
         return bool(self._get_bits(REG_SPK_DRIVER, 0x01, 0))
     
-    def reset_speaker_on_scd(self, reset):
+    def _reset_speaker_on_scd(self, reset):
         """Configure speaker reset behavior on short circuit detection.
         
         :param reset: True to reset speaker on short circuit, False to remain unchanged
@@ -935,7 +849,7 @@ class Page1Registers(PagedRegisterBase):
         # Register is inverse of parameter (0 = reset, 1 = no reset)
         return self._set_bits(REG_HP_SPK_ERR_CTL, 0x01, 1, 0 if reset else 1)
 
-    def reset_headphone_on_scd(self, reset):
+    def _reset_headphone_on_scd(self, reset):
         """Configure headphone reset behavior on short circuit detection.
         
         :param reset: True to reset headphone on short circuit, False to remain unchanged
@@ -944,7 +858,7 @@ class Page1Registers(PagedRegisterBase):
         # Register is inverse of parameter (0 = reset, 1 = no reset)
         return self._set_bits(REG_HP_SPK_ERR_CTL, 0x01, 0, 0 if reset else 1)
 
-    def configure_headphone_pop(self, wait_for_powerdown=True, powerup_time=0x07, ramp_time=0x03):
+    def _configure_headphone_pop(self, wait_for_powerdown=True, powerup_time=0x07, ramp_time=0x03):
         """Configure headphone pop removal settings.
         
         :param wait_for_powerdown: Wait for amp powerdown before DAC powerdown
@@ -959,7 +873,7 @@ class Page1Registers(PagedRegisterBase):
         self._write_register(REG_HP_POP, value)
         return True
 
-    def set_speaker_wait_time(self, wait_time=0):
+    def _set_speaker_wait_time(self, wait_time=0):
         """Set speaker power-up wait time.
         
         :param wait_time: Speaker power-up wait duration (0-7)
@@ -967,7 +881,7 @@ class Page1Registers(PagedRegisterBase):
         """
         return self._set_bits(REG_PGA_RAMP, 0x07, 4, wait_time)
 
-    def headphone_lineout(self, left, right):
+    def _headphone_lineout(self, left, right):
         """Configure headphone outputs as line-out.
         
         :param left: Configure left channel as line-out
@@ -981,7 +895,7 @@ class Page1Registers(PagedRegisterBase):
         self._write_register(REG_HP_DRIVER_CTRL, value)
         return True
 
-    def config_mic_bias(self, power_down=False, always_on=False, voltage=0):
+    def _config_mic_bias(self, power_down=False, always_on=False, voltage=0):
         """Configure MICBIAS settings."""
         value = (1 if power_down else 0) << 7
         value |= (1 if always_on else 0) << 3
@@ -990,7 +904,7 @@ class Page1Registers(PagedRegisterBase):
         self._write_register(REG_MICBIAS, value)  # Using constant instead of 0x2E
         return True
 
-    def set_input_common_mode(self, ain1_cm, ain2_cm):
+    def _set_input_common_mode(self, ain1_cm, ain2_cm):
         """Set analog input common mode connections."""
         value = 0
         if ain1_cm: value |= (1 << 7)
@@ -1009,7 +923,7 @@ class Page3Registers(PagedRegisterBase):
         """
         super().__init__(i2c_device, 3)
     
-    def config_delay_divider(self, use_mclk=True, divider=1):
+    def _config_delay_divider(self, use_mclk=True, divider=1):
         """Configure programmable delay timer clock source and divider."""
         value = (1 if use_mclk else 0) << 7
         value |= (divider & 0x7F)
@@ -1033,6 +947,11 @@ class TLV320DAC3100:
         self._page0 = Page0Registers(self._device)
         self._page1 = Page1Registers(self._device)
         self._page3 = Page3Registers(self._device)
+
+        # Initialize configuration tracking variables
+        self._sample_rate = 44100  # Default
+        self._bit_depth = 16      # Default
+        self._mclk_freq = 12000000 # Default
         
         # Reset the device
         if not self.reset():
@@ -1042,325 +961,356 @@ class TLV320DAC3100:
     
     def reset(self):
         """Reset the device."""
-        return self._page0.reset()
+        return self._page0._reset()
     
     @property
     def overtemperature(self):
         """Check if the chip is overheating."""
-        return self._page0.is_overtemperature()
-    
-    # PLL and Clock properties
-    
-    @property
-    def pll_clock_input(self):
-        """Get the PLL clock input source."""
-        return self._page0.get_pll_clock_input()
-    
-    @pll_clock_input.setter
-    def pll_clock_input(self, clkin):
-        """Set the PLL clock input source."""
-        self._page0.set_pll_clock_input(clkin)
-    
-    @property
-    def codec_clock_input(self):
-        """Get the CODEC clock input source."""
-        return self._page0.get_codec_clock_input()
-    
-    @codec_clock_input.setter
-    def codec_clock_input(self, clkin):
-        """Set the CODEC clock input source."""
-        self._page0.set_codec_clock_input(clkin)
-    
-    @property
-    def pll_power(self):
-        """Get the PLL power state."""
-        return self._page0.get_pll_power()
-    
-    @pll_power.setter
-    def pll_power(self, on):
-        """Set the PLL power state."""
-        self._page0.set_pll_power(on)
-    
-    # Speaker property
-    
-    @property
-    def speaker_enabled(self):
-        """Get the speaker amplifier state."""
-        return self._page1.get_speaker_enabled()
-    
-    @speaker_enabled.setter
-    def speaker_enabled(self, enable):
-        """Enable or disable the speaker amplifier."""
-        self._page1.set_speaker_enabled(enable)
+        return self._page0._is_overtemperature()
     
     # Method-based API for complex operations
     
-    def set_pll_values(self, p, r, j, d):
-        """Set the PLL P, R, J, and D values."""
-        return self._page0.set_pll_values(p, r, j, d)
-    
-    def power_pll(self, on):
-        """Set the PLL power state."""
-        return self._page0.set_pll_power(on)
-    
-    def set_ndac(self, enable, val):
-        """Set the NDAC value and enable/disable."""
-        return self._page0.set_ndac(enable, val)
-    
-    def set_mdac(self, enable, val):
-        """Set the MDAC value and enable/disable."""
-        return self._page0.set_mdac(enable, val)
-    
-    def set_codec_interface(self, format, data_len, bclk_out=False, wclk_out=False):
-        """Set the codec interface parameters."""
-        return self._page0.set_codec_interface(format, data_len, bclk_out, wclk_out)
-    
     def set_headset_detect(self, enable, detect_debounce=0, button_debounce=0):
         """Configure headset detection settings."""
-        return self._page0.set_headset_detect(enable, detect_debounce, button_debounce)
+        return self._page0._set_headset_detect(enable, detect_debounce, button_debounce)
     
-    def set_int1_source(self, headset_detect, button_press, dac_drc, 
+    def int1_source(self, headset_detect, button_press, dac_drc, 
                        agc_noise, over_current, multiple_pulse):
         """Configure the INT1 interrupt sources."""
-        return self._page0.set_int1_source(headset_detect, button_press, dac_drc, 
+        return self._page0._set_int1_source(headset_detect, button_press, dac_drc, 
                                         agc_noise, over_current, multiple_pulse)
-    
-    def set_gpio1_mode(self, mode):
-        """Set the GPIO1 pin mode."""
-        return self._page0.set_gpio1_mode(mode)
 
-    def set_dac_data_path(self, left_dac_on, right_dac_on, 
-                         left_path=DAC_PATH_NORMAL, 
-                         right_path=DAC_PATH_NORMAL, 
-                         volume_step=VOLUME_STEP_1SAMPLE):
-        """Configure the DAC data path settings."""
-        return self._page0.set_dac_data_path(left_dac_on, right_dac_on, 
-                                          left_path, right_path, volume_step)
+    @property
+    def left_dac(self):
+        """Get the left DAC enabled status."""
+        return self._page0._get_dac_data_path()['left_dac_on']
+
+    @left_dac.setter
+    def left_dac(self, enabled):
+        """Set the left DAC enabled status."""
+        current = self._page0._get_dac_data_path()
+        self._page0._set_dac_data_path(
+            enabled, 
+            current['right_dac_on'],
+            current['left_path'],
+            current['right_path'],
+            current['volume_step']
+        )
+
+    @property
+    def right_dac(self):
+        """Get the right DAC enabled status."""
+        return self._page0._get_dac_data_path()['right_dac_on']
+
+    @right_dac.setter
+    def right_dac(self, enabled):
+        """Set the right DAC enabled status."""
+        current = self._page0._get_dac_data_path()
+        self._page0._set_dac_data_path(
+            current['left_dac_on'],
+            enabled,
+            current['left_path'],
+            current['right_path'],
+            current['volume_step']
+        )
+
+    @property
+    def left_dac_path(self):
+        """Get the left DAC path setting."""
+        return self._page0._get_dac_data_path()['left_path']
+
+    @left_dac_path.setter
+    def left_dac_path(self, path):
+        """Set the left DAC path."""
+        current = self._page0._get_dac_data_path()
+        self._page0._set_dac_data_path(
+            current['left_dac_on'],
+            current['right_dac_on'],
+            path,
+            current['right_path'],
+            current['volume_step']
+        )
+
+    @property
+    def right_dac_path(self):
+        """Get the right DAC path setting."""
+        return self._page0._get_dac_data_path()['right_path']
+
+    @right_dac_path.setter
+    def right_dac_path(self, path):
+        """Set the right DAC path."""
+        current = self._page0._get_dac_data_path()
+        self._page0._set_dac_data_path(
+            current['left_dac_on'],
+            current['right_dac_on'],
+            current['left_path'],
+            path,
+            current['volume_step']
+        )
+
+    @property
+    def dac_volume_step(self):
+        """DAC volume step setting."""
+        return self._page0._get_dac_data_path()['volume_step']
+
+    @dac_volume_step.setter
+    def dac_volume_step(self, step):
+        current = self._page0._get_dac_data_path()
+        self._page0._set_dac_data_path(
+            current['left_dac_on'],
+            current['right_dac_on'],
+            current['left_path'],
+            current['right_path'],
+            step
+        )
     
     def configure_analog_inputs(self, left_dac=DAC_ROUTE_NONE, right_dac=DAC_ROUTE_NONE,
                               left_ain1=False, left_ain2=False, right_ain2=False, 
                               hpl_routed_to_hpr=False):
         """Configure DAC and analog input routing."""
-        return self._page1.configure_analog_inputs(left_dac, right_dac, 
+        return self._page1._configure_analog_inputs(left_dac, right_dac, 
                                                left_ain1, left_ain2, 
                                                right_ain2, hpl_routed_to_hpr)
     
-    def set_dac_volume_control(self, left_mute, right_mute, control=VOL_INDEPENDENT):
-        """Configure the DAC volume control settings."""
-        return self._page0.set_dac_volume_control(left_mute, right_mute, control)
-    
-    def set_channel_volume(self, right_channel, db):
-        """Set DAC channel volume in dB."""
-        return self._page0.set_channel_volume(right_channel, db)
-    
-    def configure_headphone_driver(self, left_powered, right_powered, 
-                                  common=HP_COMMON_1_35V, power_down_on_scd=False):
-        """Configure headphone driver settings."""
-        return self._page1.configure_headphone_driver(left_powered, right_powered, 
-                                                   common, power_down_on_scd)
-    
-    def set_hpl_volume(self, route_enabled, gain=0x7F):
-        """Set HPL analog volume control."""
-        return self._page1.set_hpl_volume(route_enabled, gain)
-    
-    def configure_hpl_pga(self, gain_db=0, unmute=True):
-        """Configure HPL driver PGA settings."""
-        return self._page1.configure_hpl_pga(gain_db, unmute)
-    
-    def set_hpr_volume(self, route_enabled, gain=0x7F):
-        """Set HPR analog volume control."""
-        return self._page1.set_hpr_volume(route_enabled, gain)
-    
-    def configure_hpr_pga(self, gain_db=0, unmute=True):
-        """Configure HPR driver PGA settings."""
-        return self._page1.configure_hpr_pga(gain_db, unmute)
-    
-    def enable_speaker(self, enable):
-        """Enable or disable the Class-D speaker amplifier."""
-        return self._page1.set_speaker_enabled(enable)
-    
-    def configure_spk_pga(self, gain=SPK_GAIN_6DB, unmute=True):
-        """Configure Speaker driver settings."""
-        return self._page1.configure_spk_pga(gain, unmute)
-    
-    def set_spk_volume(self, route_enabled, gain=0x7F):
-        """Set Speaker analog volume control."""
-        return self._page1.set_spk_volume(route_enabled, gain)
+    @property
+    def left_dac_mute(self):
+        """Get the left DAC mute status."""
+        return self._page0._get_dac_volume_control()['left_mute']
+
+    @left_dac_mute.setter
+    def left_dac_mute(self, mute):
+        """Set the left DAC mute status."""
+        current = self._page0._get_dac_volume_control()
+        self._page0._set_dac_volume_control(mute, current['right_mute'], current['control'])
+
+    @property
+    def right_dac_mute(self):
+        """Get the right DAC mute status."""
+        return self._page0._get_dac_volume_control()['right_mute']
+
+    @right_dac_mute.setter
+    def right_dac_mute(self, mute):
+        """Set the right DAC mute status."""
+        current = self._page0._get_dac_volume_control()
+        self._page0._set_dac_volume_control(current['left_mute'], mute, current['control'])
+
+    @property
+    def dac_volume_control_mode(self):
+        """DAC volume control mode."""
+        return self._page0._get_dac_volume_control()['control']
+
+    @dac_volume_control_mode.setter
+    def dac_volume_control_mode(self, mode):
+        """Set the volume control mode."""
+        current = self._page0._get_dac_volume_control()
+        self._page0._set_dac_volume_control(current['left_mute'], current['right_mute'], mode)
     
     @property
-    def clock_divider_input(self):
-        """Get the current clock divider input source."""
-        return self._page0.get_clock_divider_input()
+    def left_channel_volume(self):
+        """Get left DAC channel volume in dB."""
+        return self._page0._get_channel_volume(False)
 
-    @clock_divider_input.setter
-    def clock_divider_input(self, clkin):
-        """Set the clock divider input source."""
-        self._page0.set_clock_divider_input(clkin)
+    @left_channel_volume.setter
+    def left_channel_volume(self, db):
+        """Set left DAC channel volume in dB."""
+        self._page0._set_channel_volume(False, db)
 
-    def get_clkout_m(self):
-        """Get the CLKOUT M divider value and enabled state.
-        
-        :return: Tuple of (enabled, value)
-        """
-        return self._page0.get_clkout_m()
+    @property
+    def right_channel_volume(self):
+        """Get right DAC channel volume in dB."""
+        return self._page0._get_channel_volume(True)
 
-    def get_bclk_offset(self):
-        """Get the BCLK data slot offset.
-        
-        :return: Current offset value (0-255)
-        """
-        return self._page0.get_bclk_offset()
-
-    def get_bclk_n(self):
-        """Get the BCLK N divider value and enabled state.
-        
-        :return: Tuple of (enabled, value)
-        """
-        return self._page0.get_bclk_n()
+    @right_channel_volume.setter
+    def right_channel_volume(self, db):
+        """Set right DAC channel volume in dB."""
+        self._page0._set_channel_volume(True, db)
     
-    def get_pll_values(self):
-        """Get the current PLL P, R, J, and D values.
-        
-        :return: Tuple of (P, R, J, D) values
-        """
-        return self._page0.get_pll_values()
-
-    def get_ndac(self):
-        """Get the NDAC value and enabled state.
-        
-        :return: Tuple of (enabled, value)
-        """
-        return self._page0.get_ndac()
-
-    def get_mdac(self):
-        """Get the MDAC value and enabled state.
-        
-        :return: Tuple of (enabled, value)
-        """
-        return self._page0.get_mdac()
-
-    def get_dosr(self):
-        """Get the DOSR divider value.
-        
-        :return: Current DOSR value
-        """
-        return self._page0.get_dosr()
-
-    def set_dosr(self, val):
-        """Set the DOSR divider value.
-        
-        :param val: DOSR divider value (2-1024, except 1023)
-        :return: True if successful, False if failure
-        """
-        return self._page0.set_dosr(val)
+    def manual_headphone_driver(self, left_powered, right_powered, 
+                                  common=HP_COMMON_1_35V, power_down_on_scd=False):
+        """Configure headphone driver settings."""
+        return self._page1._configure_headphone_driver(left_powered, right_powered, 
+                                                   common, power_down_on_scd)
     
-    def get_dac_flags(self):
-        """Get the DAC and output driver status flags.
-        
-        :return: Dictionary with status flags for various components
-        """
-        return self._page0.get_dac_flags()
-
-    def get_gpio1_input(self):
-        """Get the current GPIO1 input value.
-        
-        :return: Current GPIO1 input state (True/False)
-        """
-        return self._page0.get_gpio1_input()
-
-    def get_din_input(self):
-        """Get the current DIN input value.
-        
-        :return: Current DIN input state (True/False)
-        """
-        return self._page0.get_din_input()
-
-    def get_codec_interface(self):
-        """Get the current codec interface settings.
-        
-        :return: Dictionary with format, data_len, bclk_out, and wclk_out values
-        """
-        return self._page0.get_codec_interface()
-
-    def get_dac_data_path(self):
-        """Get the current DAC data path configuration.
-        
-        :return: Dictionary with DAC data path settings
-        """
-        return self._page0.get_dac_data_path()
-
-    def get_dac_volume_control(self):
-        """Get the current DAC volume control configuration.
-        
-        :return: Dictionary with volume control settings
-        """
-        return self._page0.get_dac_volume_control()
-
-    def get_channel_volume(self, right_channel):
-        """Get DAC channel volume in dB.
-        
-        :param right_channel: True for right channel, False for left channel
-        :return: Current volume in dB
-        """
-        return self._page0.get_channel_volume(right_channel)
+    def manual_headphone_left_volume(self, route_enabled, gain=0x7F):
+        """Set HPL analog volume control."""
+        return self._page1._set_hpl_volume(route_enabled, gain)
     
-    def is_headphone_shorted(self):
-        """Check if headphone short circuit is detected.
-        
-        :return: True if short circuit detected, False if not
-        """
-        return self._page1.is_headphone_shorted()
+    def manual_headphone_right_volume(self, route_enabled, gain=0x7F):
+        """Set HPR analog volume control."""
+        return self._page1._set_hpr_volume(route_enabled, gain)
 
-    def is_speaker_shorted(self):
-        """Check if speaker short circuit is detected.
-        
-        :return: True if short circuit detected, False if not
-        """
-        return self._page1.is_speaker_shorted()
+    @property
+    def headphone_left_gain(self):
+        """Get the left headphone gain in dB."""
+        reg_value = self._page1._read_register(REG_HPL_DRIVER)
+        return (reg_value >> 3) & 0x0F
 
-    def is_hpl_gain_applied(self):
-        """Check if all programmed gains have been applied to HPL.
-        
-        :return: True if gains applied, False if still ramping
-        """
-        return self._page1.is_hpl_gain_applied()
+    @headphone_left_gain.setter
+    def headphone_left_gain(self, gain_db):
+        """Set the left headphone gain in dB."""
+        unmute = not self.headphone_left_mute
+        self._page1._configure_hpl_pga(gain_db, unmute)
 
-    def is_hpr_gain_applied(self):
-        """Check if all programmed gains have been applied to HPR.
-        
-        :return: True if gains applied, False if still ramping
-        """
-        return self._page1.is_hpr_gain_applied()
+    @property
+    def headphone_left_mute(self):
+        """Get the left headphone mute status."""
+        reg_value = self._page1._read_register(REG_HPL_DRIVER)
+        return not bool(reg_value & (1 << 2))  # Inverse of unmute bit
 
-    def is_spk_gain_applied(self):
-        """Check if all programmed gains have been applied to Speaker.
-        
-        :return: True if gains applied, False if still ramping
-        """
-        return self._page1.is_spk_gain_applied()
+    @headphone_left_mute.setter
+    def headphone_left_mute(self, mute):
+        """Set the left headphone mute status."""
+        gain = self.headphone_left_gain
+        self._page1._configure_hpl_pga(gain, not mute)  # Unmute is inverse of mute
 
-    def get_headset_status(self):
+    @property
+    def headphone_right_gain(self):
+        """Get the right headphone gain in dB."""
+        reg_value = self._page1._read_register(REG_HPR_DRIVER)
+        return (reg_value >> 3) & 0x0F
+
+    @headphone_right_gain.setter
+    def headphone_right_gain(self, gain_db):
+        """Set the right headphone gain in dB."""
+        unmute = not self.headphone_right_mute
+        self._page1._configure_hpr_pga(gain_db, unmute)
+
+    @property
+    def headphone_right_mute(self):
+        """Get the right headphone mute status."""
+        reg_value = self._page1._read_register(REG_HPR_DRIVER)
+        return not bool(reg_value & (1 << 2))  # Inverse of unmute bit
+
+    @headphone_right_mute.setter
+    def headphone_right_mute(self, mute):
+        """Set the right headphone mute status."""
+        gain = self.headphone_right_gain
+        self._page1._configure_hpr_pga(gain, not mute)  # Unmute is inverse of mute
+        
+    @property
+    def speaker_gain(self):
+        """Get the speaker gain setting."""
+        reg_value = self._page1._read_register(REG_SPK_DRIVER)
+        return (reg_value >> 3) & 0x03
+
+    @speaker_gain.setter
+    def speaker_gain(self, gain):
+        """Set the speaker gain."""
+        unmute = not self.speaker_mute
+        self._page1._configure_spk_pga(gain, unmute)
+
+    @property
+    def speaker_mute(self):
+        """Get the speaker mute status."""
+        reg_value = self._page1._read_register(REG_SPK_DRIVER)
+        return not bool(reg_value & (1 << 2))  # Inverse of unmute bit
+
+    @speaker_mute.setter
+    def speaker_mute(self, mute):
+        """Set the speaker mute status."""
+        gain = self.speaker_gain
+        self._page1._configure_spk_pga(gain, not mute)  # Unmute is inverse of mute
+    
+    @property
+    def dac_flags(self):
+        """Get the DAC and output driver status flags."""
+        return self._page0._get_dac_flags()
+
+    @property
+    def gpio1_mode(self):
+        """Get the current GPIO1 pin mode.
+        
+        :return: The GPIO1 mode setting
+        """
+        value = self._page0._read_register(REG_GPIO1_CTRL)
+        return (value >> 2) & 0x0F
+
+    @gpio1_mode.setter
+    def gpio1_mode(self, mode):
+        """Set the GPIO1 pin mode.
+        
+        :param mode: One of the GPIO1_* mode constants
+        """
+        self._page0._set_gpio1_mode(mode)
+
+    @property
+    def din_input(self):
+        """Get the current DIN input value."""
+        return self._page0._get_din_input()
+
+    @property
+    def codec_interface(self):
+        """Get the current codec interface settings."""
+        return self._page0._get_codec_interface()
+    
+    @property
+    def headphone_shorted(self):
+        """Check if headphone short circuit is detected."""
+        return self._page1._is_headphone_shorted()
+
+    @property
+    def speaker_shorted(self):
+        """Check if speaker short circuit is detected."""
+        return self._page1._is_speaker_shorted()
+
+    @property
+    def hpl_gain_applied(self):
+        """Check if all programmed gains have been applied to HPL."""
+        return self._page1._is_hpl_gain_applied()
+
+    @property
+    def hpr_gain_applied(self):
+        """Check if all programmed gains have been applied to HPR."""
+        return self._page1._is_hpr_gain_applied()
+
+    @property
+    def speaker_gain_applied(self):
+        """Check if all programmed gains have been applied to Speaker."""
+        return self._page1._is_spk_gain_applied()
+
+    @property
+    def headset_status(self):
         """Get current headset detection status.
         
         :return: Integer value representing headset status (0=none, 1=without mic, 3=with mic)
         """
-        return self._page0.get_headset_status()
+        return self._page0._get_headset_status()
     
+    @property
+    def reset_speaker_on_scd(self):
+        """Get the speaker reset behavior on short circuit detection.
+        
+        :return: True if speaker resets on short circuit, False otherwise
+        """
+        value = self._page1._read_register(REG_HP_SPK_ERR_CTL)
+        # Register bit is inverse of property (0 = reset, 1 = no reset)
+        return not bool((value >> 1) & 0x01)
+
+    @reset_speaker_on_scd.setter
     def reset_speaker_on_scd(self, reset):
         """Configure speaker reset behavior on short circuit detection.
         
         :param reset: True to reset speaker on short circuit, False to remain unchanged
-        :return: True if successful
         """
-        return self._page1.reset_speaker_on_scd(reset)
+        self._page1._reset_speaker_on_scd(reset)
 
+    @property
+    def reset_headphone_on_scd(self):
+        """Get the headphone reset behavior on short circuit detection.
+        
+        :return: True if headphone resets on short circuit, False otherwise
+        """
+        value = self._page1._read_register(REG_HP_SPK_ERR_CTL)
+        # Register bit is inverse of property (0 = reset, 1 = no reset)
+        return not bool(value & 0x01)
+
+    @reset_headphone_on_scd.setter
     def reset_headphone_on_scd(self, reset):
         """Configure headphone reset behavior on short circuit detection.
         
         :param reset: True to reset headphone on short circuit, False to remain unchanged
-        :return: True if successful
         """
-        return self._page1.reset_headphone_on_scd(reset)
+        self._page1._reset_headphone_on_scd(reset)
 
     def configure_headphone_pop(self, wait_for_powerdown=True, powerup_time=0x07, ramp_time=0x03):
         """Configure headphone pop removal settings.
@@ -1370,24 +1320,45 @@ class TLV320DAC3100:
         :param ramp_time: Driver ramp-up step time (0-3)
         :return: True if successful
         """
-        return self._page1.configure_headphone_pop(wait_for_powerdown, powerup_time, ramp_time)
+        return self._page1._configure_headphone_pop(wait_for_powerdown, powerup_time, ramp_time)
 
-    def set_speaker_wait_time(self, wait_time=0):
+    @property
+    def speaker_wait_time(self):
+        """Get the current speaker power-up wait time.
+        
+        :return: The wait time setting (0-7)
+        """
+        value = self._page1._read_register(REG_PGA_RAMP)
+        return (value >> 4) & 0x07
+
+    @speaker_wait_time.setter
+    def speaker_wait_time(self, wait_time):
         """Set speaker power-up wait time.
         
         :param wait_time: Speaker power-up wait duration (0-7)
-        :return: True if successful
         """
-        return self._page1.set_speaker_wait_time(wait_time)
+        self._page1._set_speaker_wait_time(wait_time)
 
-    def headphone_lineout(self, left, right):
+    @property
+    def headphone_lineout(self):
+        """Get the current headphone line-out configuration.
+        
+        :return: True if both channels are configured as line-out, False otherwise
+        """
+        # Read the register value
+        value = self._page1._read_register(REG_HP_DRIVER_CTRL)
+        left = bool(value & (1 << 2))
+        right = bool(value & (1 << 1))
+        # Return True only if both channels are configured as line-out
+        return left and right
+
+    @headphone_lineout.setter
+    def headphone_lineout(self, enabled):
         """Configure headphone outputs as line-out.
         
-        :param left: Configure left channel as line-out
-        :param right: Configure right channel as line-out
-        :return: True if successful
+        :param enabled: True to configure both channels as line-out, False otherwise
         """
-        return self._page1.headphone_lineout(left, right)
+        self._page1._headphone_lineout(enabled, enabled)
 
     def config_mic_bias(self, power_down=False, always_on=False, voltage=0):
         """Configure MICBIAS settings.
@@ -1397,7 +1368,7 @@ class TLV320DAC3100:
         :param voltage: MICBIAS voltage setting (0-3)
         :return: True if successful
         """
-        return self._page1.config_mic_bias(power_down, always_on, voltage)
+        return self._page1._config_mic_bias(power_down, always_on, voltage)
 
     def set_input_common_mode(self, ain1_cm, ain2_cm):
         """Set analog input common mode connections.
@@ -1406,7 +1377,7 @@ class TLV320DAC3100:
         :param ain2_cm: Connect AIN2 to common mode when unused
         :return: True if successful
         """
-        return self._page1.set_input_common_mode(ain1_cm, ain2_cm)
+        return self._page1._set_input_common_mode(ain1_cm, ain2_cm)
 
     def config_delay_divider(self, use_mclk=True, divider=1):
         """Configure programmable delay timer clock source and divider.
@@ -1415,27 +1386,92 @@ class TLV320DAC3100:
         :param divider: Clock divider (1-127, or 0 for 128)
         :return: True if successful
         """
-        return self._page3.config_delay_divider(use_mclk, divider)
+        return self._page3._config_delay_divider(use_mclk, divider)
     
-    def config_vol_adc(self, pin_control=False, use_mclk=False, hysteresis=0, rate=0):
-        """Configure the Volume/MicDet pin ADC.
-        
-        :param pin_control: Enable pin control of DAC volume
-        :param use_mclk: Use MCLK instead of internal RC oscillator
-        :param hysteresis: ADC hysteresis setting (0-2)
-        :param rate: ADC sampling rate (0-7)
-        :return: True if successful
-        """
-        return self._page0.config_vol_adc(pin_control, use_mclk, hysteresis, rate)
+    @property
+    def vol_adc_pin_control(self):
+        """Get the volume ADC pin control status."""
+        reg_value = self._page0._read_register(REG_VOL_ADC_CTRL)
+        return bool(reg_value & (1 << 7))
 
-    def read_vol_adc_db(self):
-        """Read the current volume from the Volume ADC in dB.
-        
-        :return: Current volume in dB (+18 to -63 dB)
-        """
-        return self._page0.read_vol_adc_db()
+    @vol_adc_pin_control.setter
+    def vol_adc_pin_control(self, enabled):
+        """Enable or disable volume ADC pin control."""
+        current_config = self._get_vol_adc_config()
+        self._page0._config_vol_adc(
+            enabled,
+            current_config['use_mclk'],
+            current_config['hysteresis'],
+            current_config['rate']
+        )
 
-    def set_int2_source(self, headset_detect=False, button_press=False, dac_drc=False, 
+    @property
+    def vol_adc_use_mclk(self):
+        """Get the volume ADC use MCLK status."""
+        reg_value = self._page0._read_register(REG_VOL_ADC_CTRL)
+        return bool(reg_value & (1 << 6))
+
+    @vol_adc_use_mclk.setter
+    def vol_adc_use_mclk(self, use_mclk):
+        """Set whether to use MCLK for volume ADC."""
+        current_config = self._get_vol_adc_config()
+        self._page0._config_vol_adc(
+            current_config['pin_control'],
+            use_mclk,
+            current_config['hysteresis'],
+            current_config['rate']
+        )
+
+    @property
+    def vol_adc_hysteresis(self):
+        """Get the volume ADC hysteresis setting."""
+        reg_value = self._page0._read_register(REG_VOL_ADC_CTRL)
+        return (reg_value >> 4) & 0x03
+
+    @vol_adc_hysteresis.setter
+    def vol_adc_hysteresis(self, hysteresis):
+        """Set the volume ADC hysteresis."""
+        current_config = self._get_vol_adc_config()
+        self._page0._config_vol_adc(
+            current_config['pin_control'],
+            current_config['use_mclk'],
+            hysteresis,
+            current_config['rate']
+        )
+
+    @property
+    def vol_adc_rate(self):
+        """Get the volume ADC sampling rate."""
+        reg_value = self._page0._read_register(REG_VOL_ADC_CTRL)
+        return reg_value & 0x07
+
+    @vol_adc_rate.setter
+    def vol_adc_rate(self, rate):
+        """Set the volume ADC sampling rate."""
+        current_config = self._get_vol_adc_config()
+        self._page0._config_vol_adc(
+            current_config['pin_control'],
+            current_config['use_mclk'],
+            current_config['hysteresis'],
+            rate
+        )
+
+    def _get_vol_adc_config(self):
+        """Helper method to get the current volume ADC configuration."""
+        reg_value = self._page0._read_register(REG_VOL_ADC_CTRL)
+        return {
+            'pin_control': bool(reg_value & (1 << 7)),
+            'use_mclk': bool(reg_value & (1 << 6)),
+            'hysteresis': (reg_value >> 4) & 0x03,
+            'rate': reg_value & 0x07
+        }
+
+    @property
+    def vol_adc_db(self):
+        """Read the current volume from the Volume ADC in dB."""
+        return self._page0._read_vol_adc_db()
+
+    def int2_sources(self, headset_detect=False, button_press=False, dac_drc=False, 
                     agc_noise=False, over_current=False, multiple_pulse=False):
         """Configure the INT2 interrupt sources.
         
@@ -1447,5 +1483,249 @@ class TLV320DAC3100:
         :param multiple_pulse: If true, INT2 generates multiple pulses until flag read
         :return: True if successful
         """
-        return self._page0.set_int2_source(headset_detect, button_press, dac_drc, 
+        return self._page0._set_int2_source(headset_detect, button_press, dac_drc, 
                                         agc_noise, over_current, multiple_pulse)
+    
+    def configure_clocks(self, mclk_freq, sample_rate, bit_depth=16):
+        """Configure the TLV320DAC3100 clock settings.
+        
+        This function configures all necessary clock settings including PLL, dividers,
+        and interface settings to achieve the requested sample rate with the provided
+        master clock frequency.
+        
+        :param mclk_freq: The master clock frequency in Hz (e.g., 12000000 for 12MHz)
+        :param sample_rate: The desired sample rate in Hz (e.g., 44100, 48000)
+        :param bit_depth: The bit depth (16, 20, 24, or 32)
+        :return: True if successful, False otherwise
+        """
+        # Store these values for later retrieval
+        self._mclk_freq = mclk_freq
+        self._sample_rate = sample_rate
+        self._bit_depth = bit_depth
+        
+        return self._page0._configure_clocks_for_sample_rate(mclk_freq, sample_rate, bit_depth)
+
+    @property
+    def audio_preset(self):
+        """Get the current audio preset based on sample rate and bit depth.
+        
+        :return: One of the PRESET_* constants, or None if no matching preset
+        """
+        if self._sample_rate == 22050 and self._bit_depth == 16:
+            return PRESET_MID_QUALITY
+        elif self._sample_rate == 44100 and self._bit_depth == 16:
+            return PRESET_CD_QUALITY
+        elif self._sample_rate == 48000 and self._bit_depth == 24:
+            return PRESET_DVD_QUALITY
+        elif self._sample_rate == 96000 and self._bit_depth == 24:
+            return PRESET_HIRES_QUALITY
+        else:
+            return None
+
+    @audio_preset.setter
+    def audio_preset(self, preset):
+        """Configure the DAC for common audio presets.
+        
+        :param preset: One of the PRESET_* constants
+        """
+        if preset == PRESET_MID_QUALITY:
+            # CircuitPython synth: 22.05kHz, 16-bit
+            self._sample_rate = 22050
+            self._bit_depth = 16
+            self.configure_clocks(12000000, 22050, 16)
+        elif preset == PRESET_CD_QUALITY:
+            # CD quality: 44.1kHz, 16-bit
+            self._sample_rate = 44100
+            self._bit_depth = 16
+            self.configure_clocks(12000000, 44100, 16)
+        elif preset == PRESET_DVD_QUALITY:
+            # DVD quality: 48kHz, 24-bit
+            self._sample_rate = 48000
+            self._bit_depth = 24
+            self.configure_clocks(12000000, 48000, 24)
+        elif preset == PRESET_HIRES_QUALITY:
+            # High-res audio: 96kHz, 24-bit
+            self._sample_rate = 96000
+            self._bit_depth = 24
+            self.configure_clocks(12000000, 96000, 24)
+    
+    @property
+    def headphone_output(self):
+        """Get headphone output state (True if either left or right channel is powered)."""
+        hp_drivers = self._page1._read_register(REG_HP_DRIVERS)
+        left_powered = bool(hp_drivers & (1 << 7))
+        right_powered = bool(hp_drivers & (1 << 6))
+        return left_powered or right_powered
+
+    @headphone_output.setter
+    def headphone_output(self, enabled):
+        """Enable or disable headphone outputs."""
+        if enabled:
+            # Configure headphone drivers - power both channels with common mode voltage
+            self._page1._configure_headphone_driver(
+                left_powered=True, 
+                right_powered=True,
+                common=HP_COMMON_1_65V  # Try a higher common-mode voltage
+            )
+            
+            # Make sure HP driver registers are properly configured
+            self._page1._configure_hpl_pga(gain_db=0, unmute=True)  
+            self._page1._configure_hpr_pga(gain_db=0, unmute=True)
+            
+            # Route DAC to headphone outputs
+            self._page1._configure_analog_inputs(
+                left_dac=DAC_ROUTE_HP, 
+                right_dac=DAC_ROUTE_HP
+            )
+            
+            # Enable DAC data path
+            self._page0._set_dac_data_path(
+                left_dac_on=True,
+                right_dac_on=True,
+                left_path=DAC_PATH_NORMAL,
+                right_path=DAC_PATH_NORMAL
+            )
+            
+            # Set reasonable initial volume if not already set
+            self._page1._set_hpl_volume(route_enabled=True, gain=50)  # Use a higher gain value
+            self._page1._set_hpr_volume(route_enabled=True, gain=50)  # Use a higher gain value
+            
+            # Ensure DAC volume control is properly set
+            self._page0._set_dac_volume_control(False, False, VOL_INDEPENDENT)
+            
+            # Ensure adequate DAC volume
+            self._page0._set_channel_volume(False, 0)  # Left channel at 0dB
+            self._page0._set_channel_volume(True, 0)   # Right channel at 0dB
+        else:
+            # Power down headphone drivers
+            self._page1._configure_headphone_driver(left_powered=False, right_powered=False)
+            
+            # Unroute DAC from headphone outputs
+            self._page1._configure_analog_inputs(
+                left_dac=DAC_ROUTE_NONE, 
+                right_dac=DAC_ROUTE_NONE
+            )
+
+    @property
+    def speaker_output(self):
+        """Get speaker output state."""
+        return self._page1._get_speaker_enabled()
+
+    @speaker_output.setter
+    def speaker_output(self, enabled):
+        """Enable or disable speaker output.
+        
+        This is a high-level function that:
+        1. Powers on/off the speaker amplifier
+        2. Sets appropriate volume and PGA settings when enabled
+        
+        :param enabled: True to enable speaker, False to disable
+        """
+        if enabled:
+            # Enable speaker amplifier
+            self._page1._set_speaker_enabled(True)
+            
+            # Route DAC to speaker (via mixer)
+            self._page1._configure_analog_inputs(
+                left_dac=DAC_ROUTE_MIXER,
+                right_dac=DAC_ROUTE_MIXER
+            )
+            
+            # Enable DAC data path if not already enabled
+            self._page0._set_dac_data_path(
+                left_dac_on=True,
+                right_dac_on=True
+            )
+            
+            # Set reasonable initial volume and unmute
+            self._page1._set_spk_volume(route_enabled=True, gain=20)
+            self._page1._configure_spk_pga(gain=SPK_GAIN_6DB, unmute=True)
+        else:
+            # Disable speaker amplifier
+            self._page1._set_speaker_enabled(False)
+
+    @property
+    def headphone_volume(self):
+        """Get the current headphone volume in dB.
+        
+        :return: The volume in dB (0 = max, -63.5 = min)
+        """
+        # Since HPL and HPR might have different values, we'll average them
+        # Alternatively, you could decide to just return one channel
+        left_gain = self._page1._read_register(REG_HPL_VOL) & 0x7F
+        right_gain = self._page1._read_register(REG_HPR_VOL) & 0x7F
+        
+        avg_gain = (left_gain + right_gain) / 2
+        # Convert from register value to dB
+        # 55 ≈ 0dB, 0 ≈ -63.5dB
+        db = (avg_gain - 55) / 1.14
+        
+        return db
+
+    @headphone_volume.setter
+    def headphone_volume(self, db):
+        """Set headphone volume in dB.
+        
+        :param db: Volume in dB (0 = max, -63.5 = min)
+        """
+        # Convert from dB to register gain value (0-127)
+        # 0dB = ~55, -63.5dB = 0
+        if db > 0:
+            db = 0  # Limit to 0dB to prevent distortion
+        
+        # Scale to analog volume value (approximate conversion)
+        gain = int(55 + (db * 1.14))
+        
+        # Constrain to valid range
+        gain = max(0, min(gain, 127))
+        
+        # Set volume for both channels
+        self._page1._set_hpl_volume(route_enabled=True, gain=gain)
+        self._page1._set_hpr_volume(route_enabled=True, gain=gain)
+
+    @property
+    def speaker_volume(self):
+        """Get the current speaker volume in dB.
+        
+        :return: The volume in dB (0 = max, -63.5 = min)
+        """
+        gain = self._page1._read_register(REG_SPK_VOL) & 0x7F
+        
+        # Convert from register value to dB
+        # 55 ≈ 0dB, 0 ≈ -63.5dB
+        db = (gain - 55) / 1.14
+        
+        return db
+
+    @speaker_volume.setter
+    def speaker_volume(self, db):
+        """Set speaker volume in dB.
+        
+        :param db: Volume in dB (0 = max, -63.5 = min)
+        """
+        # Convert from dB to register gain value (similar to headphone)
+        if db > 0:
+            db = 0  # Limit to 0dB to prevent distortion
+        
+        # Scale to analog volume value (approximate conversion)
+        gain = int(55 + (db * 1.14))
+        
+        # Constrain to valid range
+        gain = max(0, min(gain, 127))
+        
+        self._page1._set_spk_volume(route_enabled=True, gain=gain)
+    
+    @property
+    def sample_rate(self):
+        """Get the configured sample rate in Hz."""
+        return self._sample_rate
+
+    @property
+    def bit_depth(self):
+        """Get the configured bit depth."""
+        return self._bit_depth
+    
+    @property
+    def mclk_freq(self):
+        """Get the configured MCLK frequency in Hz."""
+        return self._mclk_freq
