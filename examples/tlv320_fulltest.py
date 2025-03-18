@@ -1,217 +1,253 @@
-# SPDX-FileCopyrightText: 2024 Your Name
+# SPDX-FileCopyrightText: 2025 Liz Clark for Adafruit Industries
+#
 # SPDX-License-Identifier: MIT
 
 """
-Comprehensive test for TLV320DAC3100 CircuitPython driver.
-Tests all implemented functionality and plays a sine wave.
+Full TLV320DAC3100 Test
+Demo all features in the library
 """
 
 import time
-import array
-import math
-import audiocore
+
 import board
-import busio
-import audiobusio
-import adafruit_tlv320
 
-def print_test_header(name):
-    """Print a test section header."""
-    print("\n" + "="*40)
-    print(f"Testing {name}")
-    print("="*40)
+from adafruit_tlv320 import (
+    DAC_PATH_MIXED,
+    DAC_PATH_NORMAL,
+    DAC_PATH_OFF,
+    DAC_PATH_SWAPPED,
+    DAC_ROUTE_HP,
+    DAC_ROUTE_MIXER,
+    DAC_ROUTE_NONE,
+    GPIO1_CLKOUT,
+    GPIO1_DISABLED,
+    GPIO1_GPI,
+    GPIO1_GPO,
+    GPIO1_INPUT_MODE,
+    HP_COMMON_1_35V,
+    HP_COMMON_1_50V,
+    HP_COMMON_1_65V,
+    HP_COMMON_1_80V,
+    SPK_GAIN_6DB,
+    SPK_GAIN_12DB,
+    SPK_GAIN_18DB,
+    SPK_GAIN_24DB,
+    TLV320DAC3100,
+    VOL_INDEPENDENT,
+    VOL_LEFT_TO_RIGHT,
+    VOL_RIGHT_TO_LEFT,
+)
 
-def test_result(name, result):
-    """Print result of a test."""
-    if result:
-        print(f"✓ {name}: Success")
-    else:
-        print(f"✗ {name}: Failure")
-    return result
-
-# Initialize I2C bus
-print("Initializing I2C...")
-i2c = busio.I2C(board.SCL, board.SDA)
-
-# Initialize the TLV320DAC3100
-print("Initializing TLV320DAC3100...")
-try:
-    tlv = adafruit_tlv320.TLV320DAC3100(i2c)
-    print("DAC initialized successfully!")
-except Exception as e:
-    print(f"Failed to initialize TLV320DAC3100: {e}")
-    raise
+print("Initializing I2C and TLV320DAC3100...")
+i2c = board.I2C()
+dac = TLV320DAC3100(i2c)
 
 # Reset the device
-print_test_header("Reset")
-test_result("Reset DAC", tlv.reset())
+print("Resetting the DAC...")
+dac.reset()
+time.sleep(0.1)  # Give device time to reset
 
-# Test basic health functions
-print_test_header("Basic Health")
-print(f"Overtemperature status: {'ALERT!' if tlv.overtemperature else 'OK'}")
+# Display basic information
+print("\n=== Basic Information ===")
+print(f"Sample rate: {dac.sample_rate} Hz")
+print(f"Bit depth: {dac.bit_depth}-bit")
+print(f"MCLK frequency: {dac.mclk_freq} Hz")
+print(f"Overtemperature condition: {dac.overtemperature}")
 
-# Test Clock Configuration
-print_test_header("Clock Configuration")
+# I2S Config
+dac.configure_clocks(mclk_freq=12000000, sample_rate=22050, bit_depth=16)
+print(f"Sample rate: {dac.sample_rate} Hz")
+print(f"Bit depth: {dac.bit_depth}-bit")
+print(f"MCLK frequency: {dac.mclk_freq} Hz")
+time.sleep(0.2)
+dac.configure_clocks(mclk_freq=12000000, sample_rate=48000, bit_depth=32)
+print(f"Sample rate: {dac.sample_rate} Hz")
+print(f"Bit depth: {dac.bit_depth}-bit")
+print(f"MCLK frequency: {dac.mclk_freq} Hz")
+time.sleep(0.2)
 
-# Set PLL input and codec input
-tlv.pll_clock_input = adafruit_tlv320.PLL_CLKIN_BCLK
-tlv.codec_clock_input = adafruit_tlv320.CODEC_CLKIN_PLL
-print(f"PLL clock input set to: {tlv.pll_clock_input}")
-print(f"CODEC clock input set to: {tlv.codec_clock_input}")
+# Headphone Output Setup
+print("\n=== Headphone Output Setup ===")
+print("Setting up headphone output...")
+dac.headphone_output = True  # This conveniently sets up multiple parameters
+print(f"Headphone output enabled: {dac.headphone_output}")
 
-# Configure clock divider input
-tlv.clock_divider_input = adafruit_tlv320.CDIV_CLKIN_PLL
-print(f"Clock divider input: {tlv.clock_divider_input}")
+# Adjust headphone volume (in dB where 0dB is max, negative values reduce volume)
+print("\nAdjusting headphone volume...")
+print(f"Current headphone volume: {dac.headphone_volume} dB")
+dac.headphone_volume = -10  # Set to -10 dB (moderate volume)
+print(f"New headphone volume: {dac.headphone_volume} dB")
 
-# Set PLL values
-test_result("Set PLL values", tlv.set_pll_values(1, 1, 7, 6144))
-pll_vals = tlv.get_pll_values()
-print(f"PLL values: P={pll_vals[0]}, R={pll_vals[1]}, J={pll_vals[2]}, D={pll_vals[3]}")
+# Fine-tune left and right channels individually
+print("\nAdjusting left and right headphone gain...")
+print(f"Left headphone gain: {dac.headphone_left_gain}")
+print(f"Right headphone gain: {dac.headphone_right_gain}")
+dac.headphone_left_gain = 3  # Increase left channel gain
+dac.headphone_right_gain = 3  # Increase right channel gain
+print(f"New left headphone gain: {dac.headphone_left_gain}")
+print(f"New right headphone gain: {dac.headphone_right_gain}")
 
-# Set DAC clock dividers
-test_result("Set NDAC", tlv.set_ndac(True, 4))
-ndac_vals = tlv.get_ndac()
-print(f"NDAC: enabled={ndac_vals[0]}, value={ndac_vals[1]}")
+# Mute/unmute the headphones
+print("\nDemonstrating headphone mute functionality...")
+print(f"Left headphone muted: {dac.headphone_left_mute}")
+print(f"Right headphone muted: {dac.headphone_right_mute}")
+dac.headphone_left_mute = True  # Mute left channel
+dac.headphone_right_mute = False  # Ensure right channel is unmuted
+print(f"Left headphone now muted: {dac.headphone_left_mute}")
+print(f"Right headphone still unmuted: {dac.headphone_right_mute}")
+time.sleep(1)  # Listen to right channel only
+dac.headphone_left_mute = False  # Unmute left channel
+print(f"Left headphone now unmuted: {dac.headphone_left_mute}")
+dac.headphone_output = False  # turn off before speaker test
 
-test_result("Set MDAC", tlv.set_mdac(True, 1))
-mdac_vals = tlv.get_mdac()
-print(f"MDAC: enabled={mdac_vals[0]}, value={mdac_vals[1]}")
+# Speaker Output Setup
+print("\n=== Speaker Output Setup ===")
+print("Setting up speaker output...")
+dac.speaker_output = True  # This conveniently sets up multiple parameters
+print(f"Speaker output enabled: {dac.speaker_output}")
 
-test_result("Set DOSR", tlv.set_dosr(256))
-dosr_val = tlv.get_dosr()
-print(f"DOSR value: {dosr_val}")
+# Adjust speaker volume (in dB where 0dB is max, negative values reduce volume)
+print("\nAdjusting speaker volume...")
+print(f"Current speaker volume: {dac.speaker_volume} dB")
+dac.speaker_volume = -6  # Set to -6 dB (louder than headphones)
+print(f"New speaker volume: {dac.speaker_volume} dB")
 
-# Power up the PLL
-tlv.pll_power = True
-print(f"PLL power state: {'ON' if tlv.pll_power else 'OFF'}")
+# Set speaker amplifier gain
+print("\nAdjusting speaker gain...")
+print(f"Current speaker gain: {dac.speaker_gain}")
+dac.speaker_gain = SPK_GAIN_12DB  # 12dB amplification
+print(f"New speaker gain: {dac.speaker_gain}")
 
-# Test GPIO and interrupt configuration
-print_test_header("GPIO and Interrupts")
+# Mute/unmute the speaker
+print("\nDemonstrating speaker mute functionality...")
+print(f"Speaker muted: {dac.speaker_mute}")
+dac.speaker_mute = True  # Mute speaker
+print(f"Speaker now muted: {dac.speaker_mute}")
+time.sleep(1)
+dac.speaker_mute = False  # Unmute speaker
+print(f"Speaker now unmuted: {dac.speaker_mute}")
 
-test_result("Set GPIO1 mode", tlv.set_gpio1_mode(adafruit_tlv320.GPIO1_INT1))
-test_result("Set INT1 sources", tlv.set_int1_source(True, False, False, False, False, False))
-test_result("Set INT2 sources", tlv.set_int2_source(True, False, False, False, False, False))
-print(f"GPIO1 input state: {tlv.get_gpio1_input()}")
-print(f"DIN input state: {tlv.get_din_input()}")
+# DAC Signal Routing
+print("\n=== Advanced DAC Signal Routing ===")
+print("\nCurrent DAC Status:")
+print(f"Left DAC enabled: {dac.left_dac}")
+print(f"Right DAC enabled: {dac.right_dac}")
+print(f"Left DAC path: {dac.left_dac_path}")
+print(f"Right DAC path: {dac.right_dac_path}")
 
-# Test codec interface configuration
-print_test_header("Codec Interface")
+print("\nSetting up swapped stereo (left and right channels swapped)...")
+dac.left_dac_path = DAC_PATH_SWAPPED
+dac.right_dac_path = DAC_PATH_SWAPPED
+print(f"New left DAC path: {dac.left_dac_path}")
+print(f"New right DAC path: {dac.right_dac_path}")
 
-test_result("Set codec interface", tlv.set_codec_interface(adafruit_tlv320.FORMAT_I2S, adafruit_tlv320.DATA_LEN_16))
-codec_if = tlv.get_codec_interface()
-print(f"Codec interface: {codec_if}")
+print("\nSetting up mono output (mixed left and right channels)...")
+dac.left_dac_path = DAC_PATH_MIXED
+dac.right_dac_path = DAC_PATH_MIXED
+print(f"New left DAC path: {dac.left_dac_path}")
+print(f"New right DAC path: {dac.right_dac_path}")
 
-# Test DAC path configuration
-print_test_header("DAC Configuration")
+print("\nRestoring normal stereo...")
+dac.left_dac_path = DAC_PATH_NORMAL
+dac.right_dac_path = DAC_PATH_NORMAL
+print(f"New left DAC path: {dac.left_dac_path}")
+print(f"New right DAC path: {dac.right_dac_path}")
 
-test_result("Set DAC data path", tlv.set_dac_data_path(True, True))
-dac_path = tlv.get_dac_data_path()
-print(f"DAC data path: {dac_path}")
+# DAC Volume Controls
+print("\n=== DAC Volume Control Configuration ===")
+print(f"Left DAC muted: {dac.left_dac_mute}")
+print(f"Right DAC muted: {dac.right_dac_mute}")
+print(f"Volume control mode: {dac.dac_volume_control_mode}")
 
-test_result("Set DAC volume control", tlv.set_dac_volume_control(False, False, adafruit_tlv320.VOL_INDEPENDENT))
-vol_ctrl = tlv.get_dac_volume_control()
-print(f"DAC volume control: {vol_ctrl}")
+print("\nSetting volume control mode where left channel controls right...")
+dac.dac_volume_control_mode = VOL_LEFT_TO_RIGHT
+print(f"New volume control mode: {dac.dac_volume_control_mode}")
 
-test_result("Set left channel volume", tlv.set_channel_volume(False, 0))
-left_vol = tlv.get_channel_volume(False)
-print(f"Left DAC volume: {left_vol} dB")
+print("\nSetting independent volume control mode (default)...")
+dac.dac_volume_control_mode = VOL_INDEPENDENT
+print(f"New volume control mode: {dac.dac_volume_control_mode}")
 
-test_result("Set right channel volume", tlv.set_channel_volume(True, 0))
-right_vol = tlv.get_channel_volume(True)
-print(f"Right DAC volume: {right_vol} dB")
+# DAC Channel Volume
+print("\n=== DAC Channel Volume ===")
+print(f"Left DAC channel volume: {dac.left_dac_channel_volume} dB")
+print(f"Right DAC channel volume: {dac.right_dac_channel_volume} dB")
 
-# Test headphone and speaker configuration
-print_test_header("Headphone and Speaker")
+print("\nSetting different volumes for left and right channels...")
+dac.left_dac_channel_volume = -3
+dac.right_dac_channel_volume = -9
+print(f"New left DAC channel volume: {dac.left_dac_channel_volume} dB")
+print(f"New right DAC channel volume: {dac.right_dac_channel_volume} dB")
 
-test_result("Configure headphone driver", tlv.configure_headphone_driver(True, True))
-test_result("Configure analog inputs", tlv.configure_analog_inputs(adafruit_tlv320.DAC_ROUTE_HP, adafruit_tlv320.DAC_ROUTE_HP))
+# Headphone as Line-Out
+print("\n=== Configure Headphone as Line-Out ===")
+print(f"Headphone configured as line-out: {dac.headphone_lineout}")
 
-test_result("Set HPL volume", tlv.set_hpl_volume(True, 20))
-test_result("Configure HPL PGA", tlv.configure_hpl_pga(9, True))
-print(f"HPL gain applied: {tlv.is_hpl_gain_applied()}")
+# Safety Features
+print("\n=== Safety Features ===")
+print(f"Reset speaker on short circuit: {dac.reset_speaker_on_scd}")
+print(f"Reset headphone on short circuit: {dac.reset_headphone_on_scd}")
 
-test_result("Set HPR volume", tlv.set_hpr_volume(True, 20))
-test_result("Configure HPR PGA", tlv.configure_hpr_pga(9, True))
-print(f"HPR gain applied: {tlv.is_hpr_gain_applied()}")
+# Getting status flags
+print("\n=== Status Information ===")
+flags = dac.dac_flags
+print(f"Left DAC powered: {flags['left_dac_powered']}")
+print(f"Right DAC powered: {flags['right_dac_powered']}")
+print(f"Headphone left (HPL) powered: {flags['hpl_powered']}")
+print(f"Headphone right (HPR) powered: {flags['hpr_powered']}")
+print(f"Left Class-D amplifier powered: {flags['left_classd_powered']}")
+print(f"Right Class-D amplifier powered: {flags['right_classd_powered']}")
+print(f"Left PGA gain OK: {flags['left_pga_gain_ok']}")
+print(f"Right PGA gain OK: {flags['right_pga_gain_ok']}")
 
-tlv.speaker_enabled = True
-print(f"Speaker enabled: {tlv.speaker_enabled}")
-test_result("Configure SPK PGA", tlv.configure_spk_pga(adafruit_tlv320.SPK_GAIN_6DB, True))
-test_result("Set SPK volume", tlv.set_spk_volume(False, 20))
-print(f"SPK gain applied: {tlv.is_spk_gain_applied()}")
-print(f"Speaker shorted: {tlv.is_speaker_shorted()}")
+# Additional status checks via dedicated properties
+print("\nStatus via dedicated properties:")
+print(f"Speaker shorted: {dac.speaker_shorted}")
+print(f"HPL gain fully applied: {dac.hpl_gain_applied}")
+print(f"HPR gain fully applied: {dac.hpr_gain_applied}")
+print(f"Speaker gain fully applied: {dac.speaker_gain_applied}")
 
-# Test headset detection
-print_test_header("Headset Detection")
+# Higher-level shortcut methods
+print("\n=== Using Higher-Level Shortcuts ===")
+print("Demonstrating on/off control of primary outputs:")
 
-test_result("Set headset detect", tlv.set_headset_detect(True))
-headset_status = tlv.get_headset_status()
-print(f"Headset status: {headset_status}")
+print("\nTurning off headphone output...")
+dac.headphone_output = False
+print(f"Headphone output now: {dac.headphone_output}")
 
-# Test hardware configuration
-print_test_header("Hardware Configuration")
+print("\nTurning off speaker output...")
+dac.speaker_output = True
+print(f"Speaker output now: {dac.speaker_output}")
 
-test_result("Reset speaker on SCD", tlv.reset_speaker_on_scd(True))
-test_result("Reset headphone on SCD", tlv.reset_headphone_on_scd(True))
-test_result("Configure headphone pop", tlv.configure_headphone_pop(True, 0x07, 0x03))
-test_result("Set speaker wait time", tlv.set_speaker_wait_time(0x02))
-test_result("Configure headphone as lineout", tlv.headphone_lineout(False, False))
-test_result("Configure mic bias", tlv.config_mic_bias(False, False, 0x01))
-test_result("Set input common mode", tlv.set_input_common_mode(True, True))
-test_result("Configure delay divider", tlv.config_delay_divider(True, 1))
+print("\nSwapping outputs...")
+dac.speaker_output = False
+dac.headphone_output = True
+print(f"Headphone output now: {dac.headphone_output}")
+print(f"Speaker output now: {dac.speaker_output}")
 
-# Test Volume ADC
-print_test_header("Volume ADC")
+# Pop Removal Setting
+print("\n=== Headphone Pop Removal Settings ===")
+dac.configure_headphone_pop(
+    wait_for_powerdown=True,  # Wait for amp powerdown before DAC powerdown
+    powerup_time=7,  # Power-on time setting (0-11)
+    ramp_time=3,  # Ramp-up step time (0-3)
+)
+print("Headphone pop removal configured")
 
-test_result("Configure Volume ADC", tlv.config_vol_adc(False, True, 0, 0))
-vol_adc = tlv.read_vol_adc_db()
-print(f"Volume ADC reading: {vol_adc} dB")
+# External Settings (like GPIO)
+print("\n=== GPIO Configuration ===")
+print(f"Current GPIO1 mode: {dac.gpio1_mode}")
+dac.gpio1_mode = GPIO1_GPO  # Set GPIO1 as general purpose output
+print(f"New GPIO1 mode: {dac.gpio1_mode}")
+dac.gpio1_mode = GPIO1_DISABLED  # Disable GPIO1
+print(f"Disabled GPIO1 mode: {dac.gpio1_mode}")
 
-# Get DAC flags
-print_test_header("DAC Status Flags")
+# Headset Detection
+print("\n=== Headset Detection ===")
+print(f"Current headset status: {dac.headset_status}")
+# 0 = none, 1 = without mic, 3 = with mic
 
-dac_flags = tlv.get_dac_flags()
-print("DAC Flags:")
-for key, value in dac_flags.items():
-    print(f"  {key}: {value}")
+# Volume Control ADC
+print("\n=== Volume Control ADC ===")
+print(f"Volume ADC reading: {dac.vol_adc_db} dB")
 
-# Initialize I2S for audio playback
-print_test_header("Audio Playback")
-print("Initializing I2S...")
-
-try:
-    # BCLK, WCLK/LRCLK, DATA - adjust pins as needed for your board
-    audio = audiobusio.I2SOut(board.I2S_BCLK, board.I2S_WS, board.I2S_DIN)
-    
-    # Generate a sine wave
-    tone_volume = 0.5  # Higher volume
-    frequency = 440    # 440 Hz tone (A4)
-    sample_rate = 44100  # CD-quality sample rate
-    length = sample_rate // frequency
-    sine_wave = array.array("h", [0] * length)
-    for i in range(length):
-        sine_wave[i] = int((math.sin(math.pi * 2 * i / length)) * tone_volume * (2 ** 15 - 1))
-    
-    sine_wave_sample = audiocore.RawSample(sine_wave, sample_rate=sample_rate)
-    
-    print("Starting audio playback...")
-    
-    # Continuous playback
-    audio.play(sine_wave_sample, loop=True)
-    
-    # Main loop
-    print("All tests completed! Playing tone continuously.")
-    print("Press Ctrl+C to stop.")
-    
-    while True:
-        # Check for overtemperature every 5 seconds
-        if tlv.overtemperature:
-            print("WARNING: DAC is overheating!")
-        time.sleep(5)
-        
-except Exception as e:
-    print(f"Audio error: {e}")
-    
-    # If audio setup fails, just loop
-    while True:
-        time.sleep(1)
+print("\nAll examples completed!")
