@@ -517,12 +517,13 @@ class Page0Registers(PagedRegisterBase):
 
         self._write_register(_CODEC_IF_CTRL1, value)
 
-    def _configure_clocks_for_sample_rate(self, mclk_freq, sample_rate, bit_depth):
+    def _configure_clocks_for_sample_rate(self, mclk_freq: int, sample_rate: int, bit_depth: int):
         """Configure clock settings for the specified sample rate.
 
-        :param mclk_freq: The main clock frequency in Hz
+        :param mclk_freq: The main clock frequency in Hz, or 0 to use BCLK as PLL input
         :param sample_rate: The desired sample rate in Hz
         :param bit_depth: The bit depth (16, 20, 24, or 32)
+        :return: True if successful, False otherwise
         """
         if bit_depth == 16:
             data_len = DATA_LEN_16
@@ -532,7 +533,26 @@ class Page0Registers(PagedRegisterBase):
             data_len = DATA_LEN_24
         else:
             data_len = DATA_LEN_32
-        if mclk_freq % (128 * sample_rate) == 0:
+        if mclk_freq == 0:
+            self._set_codec_interface(FORMAT_I2S, data_len)
+            self._set_bits(_CLOCK_MUX1, 0x03, 2, 0b01)
+            self._set_bits(_CLOCK_MUX1, 0x03, 0, 0b11)
+            p, r, j, d = 1, 2, 32, 0
+            ndac = 8
+            mdac = 2
+            dosr = 128
+            pr_value = ((p & 0x07) << 4) | (r & 0x0F)
+            self._write_register(_PLL_PROG_PR, pr_value & 0x7F)
+            self._write_register(_PLL_PROG_J, j & 0x3F)
+            self._write_register(_PLL_PROG_D_MSB, (d >> 8) & 0xFF)
+            self._write_register(_PLL_PROG_D_LSB, d & 0xFF)
+            self._write_register(_NDAC, 0x80 | (ndac & 0x7F))
+            self._write_register(_MDAC, 0x80 | (mdac & 0x7F))
+            self._write_register(_DOSR_MSB, (dosr >> 8) & 0xFF)
+            self._write_register(_DOSR_LSB, dosr & 0xFF)
+            self._set_bits(_PLL_PROG_PR, 0x01, 7, 1)
+            time.sleep(0.01)
+        elif mclk_freq % (128 * sample_rate) == 0:
             div_ratio = mclk_freq // (128 * sample_rate)
             self._set_bits(_CLOCK_MUX1, 0x03, 0, 0b00)
             self._set_bits(_PLL_PROG_PR, 0x01, 7, 0)
@@ -542,8 +562,7 @@ class Page0Registers(PagedRegisterBase):
                 self._write_register(_DOSR_MSB, 0)
                 self._write_register(_DOSR_LSB, 128)
                 self._set_codec_interface(FORMAT_I2S, data_len)
-
-        if mclk_freq == 12000000:
+        elif mclk_freq == 12000000:
             if sample_rate == 22050:
                 p, r, j, d = 1, 1, 7, 6144
                 ndac = 8
@@ -565,7 +584,7 @@ class Page0Registers(PagedRegisterBase):
                 mdac = 1
                 dosr = 128
             else:
-                return False
+                raise ValueError("Need a valid sample rate: 22050, 44100, 48000 or 96000")
         elif mclk_freq == 24000000:
             if sample_rate == 44100:
                 p, r, j, d = 1, 2, 7, 6144
@@ -585,23 +604,22 @@ class Page0Registers(PagedRegisterBase):
             else:
                 raise ValueError("Need a valid sample rate: 44100, 48000 or 96000")
         else:
-            raise ValueError("Need a valid sample rate: 22050, 44100, 48000 or 96000")
-
-        self._set_bits(_CLOCK_MUX1, 0x03, 2, 0b00)
-        self._set_bits(_CLOCK_MUX1, 0x03, 0, 0b11)
-        pr_value = ((p & 0x07) << 4) | (r & 0x0F)
-        self._write_register(_PLL_PROG_PR, pr_value & 0x7F)
-        self._write_register(_PLL_PROG_J, j & 0x3F)
-        self._write_register(_PLL_PROG_D_MSB, (d >> 8) & 0xFF)
-        self._write_register(_PLL_PROG_D_LSB, d & 0xFF)
-        self._write_register(_NDAC, 0x80 | (ndac & 0x7F))
-        self._write_register(_MDAC, 0x80 | (mdac & 0x7F))
-        self._write_register(_DOSR_MSB, (dosr >> 8) & 0xFF)
-        self._write_register(_DOSR_LSB, dosr & 0xFF)
-        self._set_codec_interface(FORMAT_I2S, data_len)
-        self._set_bits(_PLL_PROG_PR, 0x01, 7, 1)
-        time.sleep(0.01)
-
+            raise ValueError("Need a valid MCLK frequency: 12MHz or 24MHz")
+        if mclk_freq != 0:
+            self._set_bits(_CLOCK_MUX1, 0x03, 2, 0b00)
+            self._set_bits(_CLOCK_MUX1, 0x03, 0, 0b11)
+            pr_value = ((p & 0x07) << 4) | (r & 0x0F)
+            self._write_register(_PLL_PROG_PR, pr_value & 0x7F)
+            self._write_register(_PLL_PROG_J, j & 0x3F)
+            self._write_register(_PLL_PROG_D_MSB, (d >> 8) & 0xFF)
+            self._write_register(_PLL_PROG_D_LSB, d & 0xFF)
+            self._write_register(_NDAC, 0x80 | (ndac & 0x7F))
+            self._write_register(_MDAC, 0x80 | (mdac & 0x7F))
+            self._write_register(_DOSR_MSB, (dosr >> 8) & 0xFF)
+            self._write_register(_DOSR_LSB, dosr & 0xFF)
+            self._set_codec_interface(FORMAT_I2S, data_len)
+            self._set_bits(_PLL_PROG_PR, 0x01, 7, 1)
+            time.sleep(0.01)
 
 class Page1Registers(PagedRegisterBase):
     """Page 1 registers containing analog output settings, HP/SPK controls, etc."""
@@ -839,7 +857,7 @@ class TLV320DAC3100:
         # Initialize configuration tracking variables
         self._sample_rate: int = 44100  # Default
         self._bit_depth: int = 16  # Default
-        self._mclk_freq: int = 12000000  # Default
+        self._mclk_freq: int = 0  # Default blck
 
         # Reset the device
         if not self.reset():
@@ -1709,22 +1727,26 @@ class TLV320DAC3100:
             headset_detect, button_press, dac_drc, agc_noise, over_current, multiple_pulse
         )
 
-    def configure_clocks(self, mclk_freq: int, sample_rate: int, bit_depth: int = 16) -> bool:
+    def configure_clocks(self, sample_rate: int, bit_depth: int = 16, mclk_freq: Optional[int] = None):
         """Configure the TLV320DAC3100 clock settings.
 
-        This function configures all necessary clock settings including MCLK, dividers,
-        and interface settings to achieve the requested sample rate with the provided
-        main clock frequency.
+        This function configures all necessary clock settings including PLL, dividers,
+        and interface settings to achieve the requested sample rate.
 
-        :param mclk_freq: The main clock frequency in Hz (e.g., 12000000 for 12MHz)
         :param sample_rate: The desired sample rate in Hz (e.g., 44100, 48000)
-        :param bit_depth: The bit depth (16, 20, 24, or 32)
+        :param bit_depth: The bit depth (16, 20, 24, or 32), defaults to 16
+        :param mclk_freq: The main clock frequency in Hz (e.g., 12000000 for 12MHz)
+                         If None (default), BCLK will be used as the PLL input source
         :return: True if successful, False otherwise
         """
-        self._mclk_freq = mclk_freq
         self._sample_rate = sample_rate
         self._bit_depth = bit_depth
-        return self._page0._configure_clocks_for_sample_rate(mclk_freq, sample_rate, bit_depth)
+        if mclk_freq is not None:
+            self._mclk_freq = mclk_freq
+        else:
+            self._mclk_freq = 0  # Internally use 0 to indicate BCLK mode
+        
+        return self._page0._configure_clocks_for_sample_rate(self._mclk_freq, sample_rate, bit_depth)
 
     @property
     def headphone_output(self) -> bool:

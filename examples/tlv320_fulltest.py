@@ -5,6 +5,9 @@
 """
 Full TLV320DAC3100 Test
 Demo all features in the library
+Shows advanced control for DAC, headphone and speaker
+beyond basic headphone_output & speaker_output helpers
+in simpletest.
 """
 
 import time
@@ -51,19 +54,16 @@ time.sleep(0.1)  # Give device time to reset
 print("\n=== Basic Information ===")
 print(f"Sample rate: {dac.sample_rate} Hz")
 print(f"Bit depth: {dac.bit_depth}-bit")
-print(f"MCLK frequency: {dac.mclk_freq} Hz")
 print(f"Overtemperature condition: {dac.overtemperature}")
 
 # I2S Config
-dac.configure_clocks(mclk_freq=12000000, sample_rate=22050, bit_depth=16)
+dac.configure_clocks(sample_rate=22050, bit_depth=16)
 print(f"Sample rate: {dac.sample_rate} Hz")
 print(f"Bit depth: {dac.bit_depth}-bit")
-print(f"MCLK frequency: {dac.mclk_freq} Hz")
 time.sleep(0.2)
-dac.configure_clocks(mclk_freq=12000000, sample_rate=48000, bit_depth=32)
+dac.configure_clocks(sample_rate=48000, bit_depth=32)
 print(f"Sample rate: {dac.sample_rate} Hz")
 print(f"Bit depth: {dac.bit_depth}-bit")
-print(f"MCLK frequency: {dac.mclk_freq} Hz")
 time.sleep(0.2)
 
 # Headphone Output Setup
@@ -240,11 +240,6 @@ dac.gpio1_mode = GPIO1_GPO  # Set GPIO1 as general purpose output
 print(f"New GPIO1 mode: {dac.gpio1_mode}")
 dac.gpio1_mode = GPIO1_DISABLED  # Disable GPIO1
 print(f"Disabled GPIO1 mode: {dac.gpio1_mode}")
-
-# Headset Detection
-print("\n=== Headset Detection ===")
-print(f"Current headset status: {dac.headset_status}")
-# 0 = none, 1 = without mic, 3 = with mic
 
 # Volume Control ADC
 print("\n=== Volume Control ADC ===")

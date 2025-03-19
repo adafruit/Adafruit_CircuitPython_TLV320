@@ -17,7 +17,7 @@ i2c = busio.I2C(board.SCL, board.SDA)
 dac = adafruit_tlv320.TLV320DAC3100(i2c)
 
 # set mclk, sample rate & bit depth
-dac.configure_clocks(mclk_freq=12000000, sample_rate=44100, bit_depth=16)
+dac.configure_clocks(sample_rate=44100, bit_depth=16)
 
 # use headphones
 dac.headphone_output = True
