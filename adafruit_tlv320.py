@@ -621,6 +621,7 @@ class Page0Registers(PagedRegisterBase):
             self._set_bits(_PLL_PROG_PR, 0x01, 7, 1)
             time.sleep(0.01)
 
+
 class Page1Registers(PagedRegisterBase):
     """Page 1 registers containing analog output settings, HP/SPK controls, etc."""
 
@@ -1727,7 +1728,9 @@ class TLV320DAC3100:
             headset_detect, button_press, dac_drc, agc_noise, over_current, multiple_pulse
         )
 
-    def configure_clocks(self, sample_rate: int, bit_depth: int = 16, mclk_freq: Optional[int] = None):
+    def configure_clocks(
+        self, sample_rate: int, bit_depth: int = 16, mclk_freq: Optional[int] = None
+    ):
         """Configure the TLV320DAC3100 clock settings.
 
         This function configures all necessary clock settings including PLL, dividers,
@@ -1745,8 +1748,10 @@ class TLV320DAC3100:
             self._mclk_freq = mclk_freq
         else:
             self._mclk_freq = 0  # Internally use 0 to indicate BCLK mode
-        
-        return self._page0._configure_clocks_for_sample_rate(self._mclk_freq, sample_rate, bit_depth)
+
+        return self._page0._configure_clocks_for_sample_rate(
+            self._mclk_freq, sample_rate, bit_depth
+        )
 
     @property
     def headphone_output(self) -> bool:
