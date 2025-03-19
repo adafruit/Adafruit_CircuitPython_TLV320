@@ -1376,7 +1376,7 @@ class TLV320DAC3100:
         self._page1._configure_spk_pga(gain, not mute)
 
     @property
-    def dac_flags(self) -> DACFlags:
+    def dac_flags(self) -> Dict[str, Any]:
         """Get the DAC and output driver status flags.
 
         :return: Dictionary with status flags
@@ -1425,7 +1425,7 @@ class TLV320DAC3100:
         return self._page0._get_din_input()
 
     @property
-    def codec_interface(self) -> CodecInterface:
+    def codec_interface(self) -> Dict[str, Any]:
         """Get the current codec interface settings.
 
         :return: Dictionary with codec interface settings
