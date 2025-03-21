@@ -229,8 +229,8 @@ class PagedRegisterBase:
         :param value: The value to set
         """
         reg_value = self._read_register(register)
-        reg_value &= ~(mask << shift)  # Clear the bits
-        reg_value |= (value & mask) << shift  # Set the new bits
+        reg_value &= ~(mask << shift)
+        reg_value |= (value & mask) << shift
         self._write_register(register, reg_value)
 
 
@@ -327,7 +327,7 @@ class Page0Registers(PagedRegisterBase):
             db = -63.5
         reg_val = int(db * 2)
         if reg_val == 0x80 or reg_val > 0x30:
-            return False
+            raise ValueError
 
         if right_channel:
             self._write_register(_DAC_RVOL, reg_val & 0xFF)
@@ -381,10 +381,10 @@ class Page0Registers(PagedRegisterBase):
         :return: Dictionary with format, data_len, bclk_out, and wclk_out values
         """
         reg_value = self._read_register(_CODEC_IF_CTRL1)
-        format_val = (reg_value >> 6) & 0x03  # bits 7:6
-        data_len = (reg_value >> 4) & 0x03  # bits 5:4
-        bclk_out = bool(reg_value & (1 << 3))  # bit 3
-        wclk_out = bool(reg_value & (1 << 2))  # bit 2
+        format_val = (reg_value >> 6) & 0x03
+        data_len = (reg_value >> 4) & 0x03
+        bclk_out = bool(reg_value & (1 << 3))
+        wclk_out = bool(reg_value & (1 << 2))
 
         return {
             "format": format_val,
@@ -399,11 +399,11 @@ class Page0Registers(PagedRegisterBase):
         :return: Dictionary with DAC data path settings
         """
         reg_value = self._read_register(_DAC_DATAPATH)
-        left_dac_on = bool(reg_value & (1 << 7))  # bit 7
-        right_dac_on = bool(reg_value & (1 << 6))  # bit 6
-        left_path = (reg_value >> 4) & 0x03  # bits 5:4
-        right_path = (reg_value >> 2) & 0x03  # bits 3:2
-        volume_step = reg_value & 0x03  # bits 1:0
+        left_dac_on = bool(reg_value & (1 << 7))
+        right_dac_on = bool(reg_value & (1 << 6))
+        left_path = (reg_value >> 4) & 0x03
+        right_path = (reg_value >> 2) & 0x03
+        volume_step = reg_value & 0x03
 
         return {
             "left_dac_on": left_dac_on,
@@ -419,10 +419,9 @@ class Page0Registers(PagedRegisterBase):
         :return: Dictionary with volume control settings
         """
         reg_value = self._read_register(_DAC_VOL_CTRL)
-        left_mute = bool(reg_value & (1 << 3))  # bit 3
-        right_mute = bool(reg_value & (1 << 2))  # bit 2
-        control = reg_value & 0x03  # bits 1:0
-
+        left_mute = bool(reg_value & (1 << 3))
+        right_mute = bool(reg_value & (1 << 2))
+        control = reg_value & 0x03
         return {"left_mute": left_mute, "right_mute": right_mute, "control": control}
 
     def _get_channel_volume(self, right_channel):
@@ -533,25 +532,31 @@ class Page0Registers(PagedRegisterBase):
             data_len = DATA_LEN_24
         else:
             data_len = DATA_LEN_32
+
         if mclk_freq == 0:
-            self._set_codec_interface(FORMAT_I2S, data_len)
             self._set_bits(_CLOCK_MUX1, 0x03, 2, 0b01)
             self._set_bits(_CLOCK_MUX1, 0x03, 0, 0b11)
-            p, r, j, d = 1, 2, 32, 0
-            ndac = 8
-            mdac = 2
+            p, r, j, d = 1, 3, 20, 0
+            ndac = 5
+            mdac = 3
             dosr = 128
+            # Set the data format
+            self._set_codec_interface(FORMAT_I2S, data_len)
+            # Configure PLL
             pr_value = ((p & 0x07) << 4) | (r & 0x0F)
             self._write_register(_PLL_PROG_PR, pr_value & 0x7F)
             self._write_register(_PLL_PROG_J, j & 0x3F)
             self._write_register(_PLL_PROG_D_MSB, (d >> 8) & 0xFF)
             self._write_register(_PLL_PROG_D_LSB, d & 0xFF)
+            # Configure dividers
             self._write_register(_NDAC, 0x80 | (ndac & 0x7F))
             self._write_register(_MDAC, 0x80 | (mdac & 0x7F))
             self._write_register(_DOSR_MSB, (dosr >> 8) & 0xFF)
             self._write_register(_DOSR_LSB, dosr & 0xFF)
+            # Power up PLL
             self._set_bits(_PLL_PROG_PR, 0x01, 7, 1)
             time.sleep(0.01)
+
         elif mclk_freq % (128 * sample_rate) == 0:
             div_ratio = mclk_freq // (128 * sample_rate)
             self._set_bits(_CLOCK_MUX1, 0x03, 0, 0b00)
@@ -562,6 +567,7 @@ class Page0Registers(PagedRegisterBase):
                 self._write_register(_DOSR_MSB, 0)
                 self._write_register(_DOSR_LSB, 128)
                 self._set_codec_interface(FORMAT_I2S, data_len)
+
         elif mclk_freq == 12000000:
             if sample_rate == 22050:
                 p, r, j, d = 1, 1, 7, 6144
@@ -585,6 +591,7 @@ class Page0Registers(PagedRegisterBase):
                 dosr = 128
             else:
                 raise ValueError("Need a valid sample rate: 22050, 44100, 48000 or 96000")
+
         elif mclk_freq == 24000000:
             if sample_rate == 44100:
                 p, r, j, d = 1, 2, 7, 6144
@@ -604,7 +611,8 @@ class Page0Registers(PagedRegisterBase):
             else:
                 raise ValueError("Need a valid sample rate: 44100, 48000 or 96000")
         else:
-            raise ValueError("Need a valid MCLK frequency: 12MHz or 24MHz")
+            raise ValueError("Need a valid MCLK frequency: 12MHz, 24MHz or 0 for BCLK")
+
         if mclk_freq != 0:
             self._set_bits(_CLOCK_MUX1, 0x03, 2, 0b00)
             self._set_bits(_CLOCK_MUX1, 0x03, 0, 0b11)
@@ -644,7 +652,7 @@ class Page1Registers(PagedRegisterBase):
         self, left_powered, right_powered, common=HP_COMMON_1_35V, power_down_on_scd=False
     ):
         """Headphone driver settings."""
-        value = 0x04  # bit 2 must be 1
+        value = 0x04
         if left_powered:
             value |= 1 << 7
         if right_powered:
@@ -652,7 +660,6 @@ class Page1Registers(PagedRegisterBase):
         value |= (common & 0x03) << 3
         if power_down_on_scd:
             value |= 1 << 1
-
         self._write_register(_HP_DRIVERS, value)
 
     def _configure_analog_inputs(
@@ -810,7 +817,7 @@ class Page1Registers(PagedRegisterBase):
         value = (1 if power_down else 0) << 7
         value |= (1 if always_on else 0) << 3
         value |= voltage & 0x03
-        self._write_register(_MICBIAS, value)  # Using constant instead of 0x2E
+        self._write_register(_MICBIAS, value)
 
     def _set_input_common_mode(self, ain1_cm, ain2_cm):
         """Analog input common mode connections."""
@@ -819,7 +826,7 @@ class Page1Registers(PagedRegisterBase):
             value |= 1 << 7
         if ain2_cm:
             value |= 1 << 6
-        self._write_register(_INPUT_CM, value)  # Using constant instead of 0x32
+        self._write_register(_INPUT_CM, value)
 
 
 class Page3Registers(PagedRegisterBase):
@@ -854,15 +861,23 @@ class TLV320DAC3100:
         self._page0: "Page0Registers" = Page0Registers(self._device)
         self._page1: "Page1Registers" = Page1Registers(self._device)
         self._page3: "Page3Registers" = Page3Registers(self._device)
-
-        # Initialize configuration tracking variables
-        self._sample_rate: int = 44100  # Default
-        self._bit_depth: int = 16  # Default
+        self._sample_rate: int = 44100
+        self._bit_depth: int = 16
         self._mclk_freq: int = 0  # Default blck
-
-        # Reset the device
         if not self.reset():
             raise RuntimeError("Failed to reset TLV320DAC3100")
+        time.sleep(0.01)
+        self._page0._set_channel_volume(False, 0)
+        self._page0._set_channel_volume(True, 0)
+
+        # Both DACs on with normal path by default
+        self._page0._set_dac_data_path(
+            left_dac_on=True,
+            right_dac_on=True,
+            left_path=DAC_PATH_NORMAL,
+            right_path=DAC_PATH_NORMAL,
+        )
+        self._page0._set_dac_volume_control(False, False, VOL_INDEPENDENT)
 
     # Basic properties and methods
 
@@ -1762,31 +1777,27 @@ class TLV320DAC3100:
     @headphone_output.setter
     def headphone_output(self, enabled: bool) -> None:
         """
-
         :param enabled: True to enable headphone output, False to disable
         """
         if enabled:
+            self.left_dac = True
+            self.right_dac = True
+            self.left_dac_channel_volume = 0
+            self.right_dac_channel_volume = 0
+            self.left_dac_mute = False
+            self.right_dac_mute = False
+            self.left_dac_path = DAC_PATH_NORMAL
+            self.right_dac_path = DAC_PATH_NORMAL
+            self.headphone_left_gain = 0
+            self.headphone_right_gain = 0
             self._page1._configure_headphone_driver(
                 left_powered=True, right_powered=True, common=HP_COMMON_1_65V
             )
-            self.headphone_left_gain = 0
-            self.headphone_right_gain = 0
+            self._page1._configure_analog_inputs(left_dac=DAC_ROUTE_HP, right_dac=DAC_ROUTE_HP)
             self.headphone_left_mute = False
             self.headphone_right_mute = False
-            self._page1._configure_analog_inputs(left_dac=DAC_ROUTE_HP, right_dac=DAC_ROUTE_HP)
-            self.left_dac = True
-            self.right_dac = True
-            self.left_dac_path = DAC_PATH_NORMAL
-            self.right_dac_path = DAC_PATH_NORMAL
-            self.headphone_volume = 0
-            self.dac_volume_control_mode = VOL_INDEPENDENT
-            self.left_dac_mute = False
-            self.right_dac_mute = False
-            self.left_dac_channel_volume = 0
-            self.right_dac_channel_volume = 0
         else:
             self._page1._configure_headphone_driver(left_powered=False, right_powered=False)
-            self._page1._configure_analog_inputs(left_dac=DAC_ROUTE_NONE, right_dac=DAC_ROUTE_NONE)
 
     @property
     def speaker_output(self) -> bool:
@@ -1800,18 +1811,23 @@ class TLV320DAC3100:
     @speaker_output.setter
     def speaker_output(self, enabled: bool) -> None:
         """
-
         :param enabled: True to enable speaker, False to disable
         """
         if enabled:
+            self.left_dac = True
+            self.right_dac = True
+            self.left_dac_channel_volume = 0
+            self.right_dac_channel_volume = 0
+            self.left_dac_mute = False
+            self.right_dac_mute = False
+            self.left_dac_path = DAC_PATH_NORMAL
+            self.right_dac_path = DAC_PATH_NORMAL
+            self.speaker_gain = SPK_GAIN_6DB
             self._page1._set_speaker_enabled(True)
             self._page1._configure_analog_inputs(
                 left_dac=DAC_ROUTE_MIXER, right_dac=DAC_ROUTE_MIXER
             )
-            self.left_dac = True
-            self.right_dac = True
             self.speaker_volume = -10
-            self.speaker_gain = SPK_GAIN_6DB
             self.speaker_mute = False
         else:
             self._page1._set_speaker_enabled(False)

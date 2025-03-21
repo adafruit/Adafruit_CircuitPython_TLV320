@@ -9,22 +9,21 @@ import time
 import audiobusio
 import audiocore
 import board
-import busio
 
 import adafruit_tlv320
 
-i2c = busio.I2C(board.SCL, board.SDA)
+i2c = board.I2C()
 dac = adafruit_tlv320.TLV320DAC3100(i2c)
 
-# set mclk, sample rate & bit depth
+# set sample rate & bit depth, use bclk
 dac.configure_clocks(sample_rate=44100, bit_depth=16)
 
 # use headphones
 dac.headphone_output = True
-dac.headphone_volume = -20  # dB
+dac.headphone_volume = -15  # dB
 # or use speaker
 # dac.speaker_output = True
-# dac.speaker_volume = -15 # dB
+# dac.speaker_volume = -10 # dB
 
 audio = audiobusio.I2SOut(board.I2S_BCLK, board.I2S_WS, board.I2S_DIN)
 # generate a sine wave
