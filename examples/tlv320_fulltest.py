@@ -45,11 +45,6 @@ print("Initializing I2C and TLV320DAC3100...")
 i2c = board.I2C()
 dac = TLV320DAC3100(i2c)
 
-# Reset the device
-print("Resetting the DAC...")
-dac.reset()
-time.sleep(0.1)  # Give device time to reset
-
 # Display basic information
 print("\n=== Basic Information ===")
 print(f"Sample rate: {dac.sample_rate} Hz")
@@ -57,11 +52,7 @@ print(f"Bit depth: {dac.bit_depth}-bit")
 print(f"Overtemperature condition: {dac.overtemperature}")
 
 # I2S Config
-dac.configure_clocks(sample_rate=22050, bit_depth=16)
-print(f"Sample rate: {dac.sample_rate} Hz")
-print(f"Bit depth: {dac.bit_depth}-bit")
-time.sleep(0.2)
-dac.configure_clocks(sample_rate=48000, bit_depth=32)
+dac.configure_clocks(sample_rate=44000, bit_depth=16)
 print(f"Sample rate: {dac.sample_rate} Hz")
 print(f"Bit depth: {dac.bit_depth}-bit")
 time.sleep(0.2)
