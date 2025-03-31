@@ -15,7 +15,6 @@ Implementation Notes
 
 **Hardware:**
 
-* `Link Text <url>`_
 
 **Software and Dependencies:**
 
