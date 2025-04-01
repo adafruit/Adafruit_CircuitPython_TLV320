@@ -30,7 +30,6 @@ This driver depends on:
 
 * `Adafruit CircuitPython <https://github.com/adafruit/circuitpython>`_
 * `Bus Device <https://github.com/adafruit/Adafruit_CircuitPython_BusDevice>`_
-* `Register <https://github.com/adafruit/Adafruit_CircuitPython_Register>`_
 
 Please ensure all dependencies are available on the CircuitPython filesystem.
 This is easily achieved by downloading
@@ -38,19 +37,8 @@ This is easily achieved by downloading
 or individual libraries can be installed using
 `circup <https://github.com/adafruit/circup>`_.
 
-
-
-.. todo:: Describe the Adafruit product this library works with. For PCBs, you can also add the
-image from the assets folder in the PCB's GitHub repo.
-
-`Purchase one from the Adafruit shop <http://www.adafruit.com/products/>`_
-
 Installing from PyPI
 =====================
-.. note:: This library is not available on PyPI yet. Install documentation is included
-   as a standard element. Stay tuned for PyPI availability!
-
-.. todo:: Remove the above note if PyPI version is/will be available at time of release.
 
 On supported GNU/Linux systems like the Raspberry Pi, you can install the driver locally `from
 PyPI <https://pypi.org/project/adafruit-circuitpython-tlv320/>`_.
@@ -101,8 +89,30 @@ Or the following command to update an existing version:
 Usage Example
 =============
 
-.. todo:: Add a quick, simple example. It and other examples should live in the
-examples folder and be included in docs/examples.rst.
+.. code-block:: python
+
+	import audiobusio
+	import audiocore
+	import board
+
+	import adafruit_tlv320
+
+	i2c = board.I2C()
+	dac = adafruit_tlv320.TLV320DAC3100(i2c)
+
+	# set mclk, sample rate & bit depth
+	dac.configure_clocks(mclk_freq=12000000, sample_rate=44100, bit_depth=16)
+
+	# use headphones
+	# helper function for default settings
+	dac.headphone_output = True
+	dac.headphone_volume = -20  # dB
+	# or use speaker
+	# helper function for default settings
+	# dac.speaker_output = True
+	# dac.speaker_volume = -15 # dB
+
+	audio = audiobusio.I2SOut(board.I2S_BCLK, board.I2S_WS, board.I2S_DIN)
 
 Documentation
 =============
