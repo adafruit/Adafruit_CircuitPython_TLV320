@@ -23,7 +23,7 @@ dac.headphone_output = True
 dac.headphone_volume = -15  # dB
 # or use speaker
 # dac.speaker_output = True
-# dac.speaker_volume = -10 # dB
+# dac.speaker_volume = -20 # dB
 
 audio = audiobusio.I2SOut(board.I2S_BCLK, board.I2S_WS, board.I2S_DIN)
 # generate a sine wave

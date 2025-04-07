@@ -1821,12 +1821,12 @@ class TLV320DAC3100:
             self.right_dac_mute = False
             self.left_dac_path = DAC_PATH_NORMAL
             self.right_dac_path = DAC_PATH_NORMAL
-            self.speaker_gain = SPK_GAIN_6DB
+            self.speaker_gain = SPK_GAIN_18DB
             self._page1._set_speaker_enabled(True)
             self._page1._configure_analog_inputs(
                 left_dac=DAC_ROUTE_MIXER, right_dac=DAC_ROUTE_MIXER
             )
-            self.speaker_volume = -10
+            self.speaker_volume = -20
             self.speaker_mute = False
         else:
             self._page1._set_speaker_enabled(False)
