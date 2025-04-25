@@ -25,7 +25,10 @@ dac.headphone_volume = -15  # dB
 # dac.speaker_output = True
 # dac.speaker_volume = -20 # dB
 
-audio = audiobusio.I2SOut(board.I2S_BCLK, board.I2S_WS, board.I2S_DIN)
+if "I2S_BCLK" and "I2S_WS" in dir(board):
+    audio = audiobusio.I2SOut(board.I2S_BCLK, board.I2S_WS, board.I2S_DIN)
+else:
+    audio = audiobusio.I2SOut(board.D9, board.D10, board.D11)
 # generate a sine wave
 tone_volume = 0.5
 frequency = 440
