@@ -1222,6 +1222,69 @@ class TLV320DAC3100:
         """
         self._page0._set_channel_volume(True, db)
 
+    @staticmethod
+    def _convert_reg_to_db(reg_val: int) -> float:
+        """
+        Convert a register value to decibel volume.
+
+        :param reg_val: 8-bit register value
+        :return: Volume in dB
+        """
+        if reg_val & 0x80:
+            reg_val = reg_val - 256
+
+        return reg_val * 0.5
+
+    @staticmethod
+    def _convert_db_to_reg(db: float) -> int:
+        """
+        Convert decibel volume to register value.
+
+        :param db: Volume in dB (-63.5 to 24 dB)
+        :return: 8-bit register value
+        """
+        reg_val = int(db * 2)
+        if reg_val > 0x30:
+            reg_val = 0x30
+        elif reg_val < -0x80:
+            reg_val = 0x80
+
+        if reg_val < 0:
+            reg_val += 256
+
+        return reg_val & 0xFF
+
+    @property
+    def dac_volume(self) -> float:
+        """
+        Get the current DAC digital volume in dB.
+
+        :return: Volume in dB (-63.5 to 24 dB)
+        """
+        left_vol = self._page0._read_register(_DAC_LVOL)
+        right_vol = self._page0._read_register(_DAC_RVOL)
+
+        left_db = self._convert_reg_to_db(left_vol)
+        right_db = self._convert_reg_to_db(right_vol)
+
+        return (left_db + right_db) / 2
+
+    @dac_volume.setter
+    def dac_volume(self, db: float) -> None:
+        """
+        Set the DAC digital volume in dB.
+
+        :param db: Volume in dB (-63.5 to 24 dB)
+        """
+        db = max(-63.5, min(24, db))
+        reg_val = self._convert_db_to_reg(db)
+        self._page0._set_page()
+        self._page0._write_register(_DAC_LVOL, reg_val)
+        self._page0._write_register(_DAC_RVOL, reg_val)
+
+        self.left_dac_mute = False
+        self.right_dac_mute = False
+
     def manual_headphone_driver(
         self,
         left_powered: bool,
@@ -1834,28 +1897,32 @@ class TLV320DAC3100:
     @property
     def headphone_volume(self) -> float:
         """The current headphone volume in dB.
-
-        :return: The volume in dB (0 = max, -63.5 = min)
+        :return: The volume in dB (0 = max, -78.3 = min)
         """
         left_gain = self._page1._read_register(_HPL_VOL) & 0x7F
         right_gain = self._page1._read_register(_HPR_VOL) & 0x7F
-        avg_gain = (left_gain + right_gain) / 2
-        # Convert from register value to dB
-        # 55 ≈ 0dB, 0 ≈ -63.5dB
-        db = (avg_gain - 55) / 1.14
-        return db
+
+        if left_gain == right_gain:
+            db = -left_gain / 2.0
+            db = max(-78.3, min(0, db))
+            return db
+        else:
+            avg_gain = (left_gain + right_gain) / 2
+            db = -avg_gain / 2.0
+            db = max(-78.3, min(0, db))
+            return db
 
     @headphone_volume.setter
     def headphone_volume(self, db: float) -> None:
         """
-
-        :param db: Volume in dB (0 = max, -63.5 = min)
+        Set headphone volume in dB (0 to -78.3 dB)
+        :param db: Volume in dB (0 = max, -78.3 = min)
         """
-        # Convert from dB to register gain value (0-127)
-        # 0dB = ~55, -63.5dB = 0
         if db > 0:
-            db = 0  # Limit to 0dB to prevent distortion
-        gain = int(55 + (db * 1.14))
+            db = 0
+        elif db < -78.3:
+            db = -78.3
+        gain = int(-2 * db)
         gain = max(0, min(gain, 127))
         self._page1._set_hpl_volume(route_enabled=True, gain=gain)
         self._page1._set_hpr_volume(route_enabled=True, gain=gain)
