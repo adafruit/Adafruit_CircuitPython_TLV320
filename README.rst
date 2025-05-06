@@ -106,11 +106,7 @@ Usage Example
 	# use headphones
 	# helper function for default settings
 	dac.headphone_output = True
-	dac.headphone_volume = -20  # dB
-	# or use speaker
-	# helper function for default settings
-	# dac.speaker_output = True
-	# dac.speaker_volume = -15 # dB
+	dac.dac_volume = -20  # dB
 
 	audio = audiobusio.I2SOut(board.I2S_BCLK, board.I2S_WS, board.I2S_DIN)
 
