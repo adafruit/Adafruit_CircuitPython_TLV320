@@ -97,7 +97,7 @@ Usage Example
 	import digitalio
 
 	import adafruit_tlv320
-	
+
 	# Reset the DAC before use
 	reset_pin = digitalio.DigitalInOut(board.D12)
 	reset_pin.direction = digitalio.Direction.OUTPUT
