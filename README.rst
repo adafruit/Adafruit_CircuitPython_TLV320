@@ -94,8 +94,16 @@ Usage Example
 	import audiobusio
 	import audiocore
 	import board
+	import digitalio
 
 	import adafruit_tlv320
+	
+	# Reset the DAC before use
+	reset_pin = digitalio.DigitalInOut(board.D12)
+	reset_pin.direction = digitalio.Direction.OUTPUT
+	reset_pin.value = False  # Set low to reset
+	time.sleep(0.1)  # Pause 100ms
+	reset_pin.value = True  # Set high to release from reset
 
 	i2c = board.I2C()
 	dac = adafruit_tlv320.TLV320DAC3100(i2c)
