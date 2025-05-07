@@ -13,6 +13,7 @@ in simpletest.
 import time
 
 import board
+import digitalio
 
 from adafruit_tlv320 import (
     DAC_PATH_MIXED,
@@ -40,6 +41,13 @@ from adafruit_tlv320 import (
     VOL_LEFT_TO_RIGHT,
     VOL_RIGHT_TO_LEFT,
 )
+
+# Reset the DAC before use
+reset_pin = digitalio.DigitalInOut(board.D12)
+reset_pin.direction = digitalio.Direction.OUTPUT
+reset_pin.value = False  # Set low to reset
+time.sleep(0.1)  # Pause 100ms
+reset_pin.value = True  # Set high to release from reset
 
 print("Initializing I2C and TLV320DAC3100...")
 i2c = board.I2C()
