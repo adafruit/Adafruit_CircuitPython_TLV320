@@ -877,6 +877,8 @@ class TLV320DAC3100:
             right_path=DAC_PATH_NORMAL,
         )
         self._page0._set_dac_volume_control(False, False, VOL_INDEPENDENT)
+        self.speaker_volume = -15
+        self.headphone_volume = -15
 
     # Basic properties and methods
 
