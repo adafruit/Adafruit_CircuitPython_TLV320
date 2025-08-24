@@ -1,0 +1,4 @@
+/* Monkey patch the rtd theme to prevent horizontal stacking of short items
+ * see https://github.com/readthedocs/sphinx_rtd_theme/issues/1301
+*/
+.py.property{display: block !important;}

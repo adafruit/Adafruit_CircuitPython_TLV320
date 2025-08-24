@@ -15,6 +15,11 @@ Implementation Notes
 
 **Hardware:**
 
+* `Adafruit TLV320DAC3100 - I2S DAC <https://www.adafruit.com/product/6309>`_
+
+* `Adafruit Fruit Jam <https://www.adafruit.com/product/6200>`_
+
+
 * The TLV320DAC chip has moderately complex onboard audio filtering, routing,
   and amplification capability. Each of the signal chains for speaker, headphone
   left, and headphone right start with the DAC, then they go through a mixer
@@ -122,56 +127,92 @@ DATA_LEN_24 = const(0b10)  # 24 bits
 DATA_LEN_32 = const(0b11)  # 32 bits
 
 # GPIO1 pin mode options
-GPIO1_DISABLED = const(0b0000)  # GPIO1 disabled (input and output buffers powered down)
-GPIO1_INPUT_MODE = const(0b0001)  # Input mode (secondary BCLK/WCLK/DIN input or ClockGen)
-GPIO1_GPI = const(0b0010)  # General-purpose input
-GPIO1_GPO = const(0b0011)  # General-purpose output
-GPIO1_CLKOUT = const(0b0100)  # CLKOUT output
-GPIO1_INT1 = const(0b0101)  # INT1 output
-GPIO1_INT2 = const(0b0110)  # INT2 output
-GPIO1_BCLK_OUT = const(0b1000)  # Secondary BCLK output for codec interface
-GPIO1_WCLK_OUT = const(0b1001)  # Secondary WCLK output for codec interface
+#: GPIO1 pin mode options: GPIO1 disabled (input and output buffers powered down)
+GPIO1_DISABLED = const(0b0000)
+#: GPIO1 pin mode options: Input mode (secondary BCLK/WCLK/DIN input or ClockGen)
+GPIO1_INPUT_MODE = const(0b0001)
+#: GPIO1 pin mode options: General-purpose input
+GPIO1_GPI = const(0b0010)
+#: GPIO1 pin mode options: General-purpose output
+GPIO1_GPO = const(0b0011)
+#: GPIO1 pin mode options: CLKOUT output
+GPIO1_CLKOUT = const(0b0100)
+#: GPIO1 pin mode options: INT1 output
+GPIO1_INT1 = const(0b0101)
+#: GPIO1 pin mode options: INT2 output
+GPIO1_INT2 = const(0b0110)
+#: GPIO1 pin mode options: Secondary BCLK output for codec interface
+GPIO1_BCLK_OUT = const(0b1000)
+#: GPIO1 pin mode options: Secondary WCLK output for codec interface
+GPIO1_WCLK_OUT = const(0b1001)
 
 # DAC channel data path options
-DAC_PATH_OFF = const(0b00)  # DAC data path off
-DAC_PATH_NORMAL = const(0b01)  # Normal path (L->L or R->R)
-DAC_PATH_SWAPPED = const(0b10)  # Swapped path (R->L or L->R)
-DAC_PATH_MIXED = const(0b11)  # Mixed L+R path
+#: DAC channel data path option: DAC data path off
+DAC_PATH_OFF = const(0b00)
+#: DAC channel data path option: Normal path (L->L or R->R)
+DAC_PATH_NORMAL = const(0b01)
+#: DAC channel data path option: Swapped path (R->L or L->R)
+DAC_PATH_SWAPPED = const(0b10)
+#: DAC channel data path option: Mixed L+R path
+DAC_PATH_MIXED = const(0b11)
 
 # DAC volume control soft stepping options
-VOLUME_STEP_1SAMPLE = const(0b00)  # One step per sample
-VOLUME_STEP_2SAMPLE = const(0b01)  # One step per two samples
-VOLUME_STEP_DISABLED = const(0b10)  # Soft stepping disabled
+#: DAC volume control soft stepping option: One step per sample
+VOLUME_STEP_1SAMPLE = const(0b00)
+#: DAC volume control soft stepping option: One step per two samples
+VOLUME_STEP_2SAMPLE = const(0b01)
+#: DAC volume control soft stepping option: Soft stepping disabled
+VOLUME_STEP_DISABLED = const(0b10)
 
 # DAC volume control configuration options
-VOL_INDEPENDENT = const(0b00)  # Left and right channels independent
-VOL_LEFT_TO_RIGHT = const(0b01)  # Left follows right volume
-VOL_RIGHT_TO_LEFT = const(0b10)  # Right follows left volume
+#: DAC volume control configuration option: Left and right channels independent
+VOL_INDEPENDENT = const(0b00)
+#: DAC volume control configuration option: Left follows right volume
+VOL_LEFT_TO_RIGHT = const(0b01)
+#: DAC volume control configuration option: Right follows left volume
+VOL_RIGHT_TO_LEFT = const(0b10)
 
 # DAC output routing options
-DAC_ROUTE_NONE = const(0b00)  # DAC not routed
-DAC_ROUTE_MIXER = const(0b01)  # DAC routed to mixer amplifier
-DAC_ROUTE_HP = const(0b10)  # DAC routed directly to HP driver
+#: DAC output routing option: DAC not routed
+DAC_ROUTE_NONE = const(0b00)
+#: DAC output routing option: DAC routed to mixer amplifier
+DAC_ROUTE_MIXER = const(0b01)
+#: DAC output routing option: DAC routed directly to HP driver
+DAC_ROUTE_HP = const(0b10)
 
-# Headphone common mode voltage settings
-HP_COMMON_1_35V = const(0b00)  # Common-mode voltage 1.35V
-HP_COMMON_1_50V = const(0b01)  # Common-mode voltage 1.50V
-HP_COMMON_1_65V = const(0b10)  # Common-mode voltage 1.65V
-HP_COMMON_1_80V = const(0b11)  # Common-mode voltage 1.80V
+# Headphone common mode voltage options
+#: Headphone common mode voltage option: Common-mode voltage 1.35V
+HP_COMMON_1_35V = const(0b00)
+#: Headphone common mode voltage option: Common-mode voltage 1.50V
+HP_COMMON_1_50V = const(0b01)
+#: Headphone common mode voltage option: Common-mode voltage 1.65V
+HP_COMMON_1_65V = const(0b10)
+#: Headphone common mode voltage option: Common-mode voltage 1.80V
+HP_COMMON_1_80V = const(0b11)
 
 # Headset detection debounce time options
-DEBOUNCE_16MS = const(0b000)  # 16ms debounce (2ms clock)
-DEBOUNCE_32MS = const(0b001)  # 32ms debounce (4ms clock)
-DEBOUNCE_64MS = const(0b010)  # 64ms debounce (8ms clock)
-DEBOUNCE_128MS = const(0b011)  # 128ms debounce (16ms clock)
-DEBOUNCE_256MS = const(0b100)  # 256ms debounce (32ms clock)
-DEBOUNCE_512MS = const(0b101)  # 512ms debounce (64ms clock)
+#: Headset detection debounce time option: 16ms debounce (2ms clock)
+DEBOUNCE_16MS = const(0b000)
+#: Headset detection debounce time option: 32ms debounce (4ms clock)
+DEBOUNCE_32MS = const(0b001)
+#: Headset detection debounce time option: 64ms debounce (8ms clock)
+DEBOUNCE_64MS = const(0b010)
+#: Headset detection debounce time option: 128ms debounce (16ms clock)
+DEBOUNCE_128MS = const(0b011)
+#: Headset detection debounce time option: 256ms debounce (32ms clock)
+DEBOUNCE_256MS = const(0b100)
+#: Headset detection debounce time option: 512ms debounce (64ms clock)
+DEBOUNCE_512MS = const(0b101)
 
 # Button press debounce time options
-BTN_DEBOUNCE_0MS = const(0b00)  # No debounce
-BTN_DEBOUNCE_8MS = const(0b01)  # 8ms debounce (1ms clock)
-BTN_DEBOUNCE_16MS = const(0b10)  # 16ms debounce (2ms clock)
-BTN_DEBOUNCE_32MS = const(0b11)  # 32ms debounce (4ms clock)
+#: Button press debounce time option: No debounce
+BTN_DEBOUNCE_0MS = const(0b00)
+#: Button press debounce time option: 8ms debounce (1ms clock)
+BTN_DEBOUNCE_8MS = const(0b01)
+#: Button press debounce time option: 16ms debounce (2ms clock)
+BTN_DEBOUNCE_16MS = const(0b10)
+#: Button press debounce time option: 32ms debounce (4ms clock)
+BTN_DEBOUNCE_32MS = const(0b11)
 
 # Lookup table for speaker_volume and headphone_volume.
 # These are from TLV320DAC3100 datasheet Table 6-24.
