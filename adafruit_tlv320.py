@@ -19,7 +19,6 @@ Implementation Notes
 
 * `Adafruit Fruit Jam <https://www.adafruit.com/product/6200>`_
 
-
 * The TLV320DAC chip has moderately complex onboard audio filtering, routing,
   and amplification capability. Each of the signal chains for speaker, headphone
   left, and headphone right start with the DAC, then they go through a mixer
@@ -214,44 +213,46 @@ BTN_DEBOUNCE_16MS = const(0b10)
 #: Button press debounce time option: 32ms debounce (4ms clock)
 BTN_DEBOUNCE_32MS = const(0b11)
 
+# ruff: noqa: PLR0904, PLR0912, PLR0913, PLR0915, PLR0917
+
 # Lookup table for speaker_volume and headphone_volume.
 # These are from TLV320DAC3100 datasheet Table 6-24.
 TABLE_6_24 = (
-      0,    #   0  Begin linear segment: round((-1.99 * dB) - 0.2)
-     -0.5,  #   1
-     -1,    #   2
-     -1.5,  #   3
-     -2,    #   4
-     -2.5,  #   5
-     -3,    #   6
-     -3.5,  #   7
-     -4,    #   8
-     -4.5,  #   9
-     -5,    #  10
-     -5.5,  #  11
-     -6,    #  12
-     -6.5,  #  13
-     -7,    #  14
-     -7.5,  #  15
-     -8,    #  16
-     -8.5,  #  17
-     -9,    #  18
-     -9.5,  #  19
-    -10,    #  20
+    0,  #       0  Begin linear segment: round((-1.99 * dB) - 0.2)
+    -0.5,  #    1
+    -1,  #      2
+    -1.5,  #    3
+    -2,  #      4
+    -2.5,  #    5
+    -3,  #      6
+    -3.5,  #    7
+    -4,  #      8
+    -4.5,  #    9
+    -5,  #     10
+    -5.5,  #   11
+    -6,  #     12
+    -6.5,  #   13
+    -7,  #     14
+    -7.5,  #   15
+    -8,  #     16
+    -8.5,  #   17
+    -9,  #     18
+    -9.5,  #   19
+    -10,  #    20
     -10.5,  #  21
-    -11,    #  22
+    -11,  #    22
     -11.5,  #  23
-    -12,    #  24
+    -12,  #    24
     -12.5,  #  25
-    -13,    #  26
+    -13,  #    26
     -13.5,  #  27
-    -14,    #  28
+    -14,  #    28
     -14.5,  #  29
-    -15,    #  30
+    -15,  #    30
     -15.5,  #  31
-    -16,    #  32
+    -16,  #    32
     -16.5,  #  33
-    -17,    #  34
+    -17,  #    34
     -17.5,  #  35
     -18.1,  #  36
     -18.6,  #  37
@@ -316,9 +317,9 @@ TABLE_6_24 = (
     -48.2,  #  96
     -48.7,  #  97
     -49.3,  #  98
-    -50,    #  99
+    -50,  #    99
     -50.3,  # 100
-    -51,    # 101
+    -51,  #   101
     -51.4,  # 102
     -51.8,  # 103
     -52.2,  # 104
@@ -347,7 +348,36 @@ TABLE_6_24 = (
     -78.3,  # 127
 )
 
-# ruff: noqa: PLR0904, PLR0912, PLR0913, PLR0915, PLR0917
+
+def _table_6_24_db_to_uint7(self, db: float) -> int:
+    """Convert gain dB to 7-bit unsigned int following datasheet Table 6-24.
+
+    :param db: Analog gain in dB; range is 0 dB (loud) to -78.3 dB (soft)
+    :return: 7-bit unsigned int value, range is 0 (loud) to 127 (soft)
+    """
+    # Clip dB argument to fit in the valid range if it's too big or too small
+    db = max(-78.3, min(0, db))
+    # Loop through the table, looking for the lowest table index where the
+    # target dB value is not greater than the table dB value
+    result = 0
+    for table_u7, table_db in enumerate(TABLE_6_24):
+        if db < table_db:
+            result = table_u7
+        elif db == table_db:
+            result = table_u7
+            break
+        else:
+            break
+    return result
+
+
+def _table_6_24_uint7_to_db(self, u7: int) -> float:
+    """Convert 7-bit unsigned int to gain dB following datasheet Table 6-24.
+
+    :param u7: 7-bit unsigned int value, range is 0 (loud) to 127 (soft)
+    :return: Analog gain in dB, range is 0 dB (loud) to -78.3 dB (soft)
+    """
+    return TABLE_6_24[max(0, min(127, int(u7)))]
 
 
 class _PagedRegisterBase:
@@ -919,10 +949,8 @@ class _Page1Registers(_PagedRegisterBase):
         """Speaker driver settings.
         :raises ValueError: If set to anything other than 6, 12, 18, or 24
         """
-        if gain_db not in (6, 12, 18, 24):
-            raise ValueError(
-                f"Invalid speaker gain: {gain_db}. Must be 6, 12, 18, or 24."
-            )
+        if gain_db not in set((6, 12, 18, 24)):
+            raise ValueError(f"Invalid speaker gain: {gain_db}. Must be 6, 12, 18, or 24.")
         uint2_val = (gain_db / 6) - 1
         value = (uint2_val & 0x03) << 3
         if unmute:
@@ -1075,35 +1103,6 @@ class TLV320DAC3100:
             right_path=DAC_PATH_NORMAL,
         )
         self._page0._set_dac_volume_control(False, False, VOL_INDEPENDENT)
-
-    def _table_6_24_db_to_uint7(self, db: float) -> int:
-        """Convert gain dB to 7-bit unsigned int following datasheet Table 6-24.
-
-        :param db: Analog gain in dB; range is 0 dB (loud) to -78.3 dB (soft)
-        :return: 7-bit unsigned int value, range is 0 (loud) to 127 (soft)
-        """
-        # Clip dB argument to fit in the valid range if it's too big or too small
-        db = max(-78.3, min(0, db))
-        # Loop through the table, looking for the lowest table index where the
-        # target dB value is not greater than the table dB value
-        result = 0
-        for (table_u7, table_db) in enumerate(TABLE_6_24):
-            if db < table_db:
-                result = table_u7
-            elif db == table_db:
-                result = table_u7
-                break
-            else:
-                break
-        return result
-
-    def _table_6_24_uint7_to_db(self, u7: int) -> float:
-        """Convert 7-bit unsigned int to gain dB following datasheet Table 6-24.
-
-        :param u7: 7-bit unsigned int value, range is 0 (loud) to 127 (soft)
-        :return: Analog gain in dB, range is 0 dB (loud) to -78.3 dB (soft)
-        """
-        return TABLE_6_24[max(0, min(127, int(u7)))]
 
     # Basic properties and methods
 
@@ -2146,8 +2145,8 @@ class TLV320DAC3100:
         """
         left_gain_u7 = self._page1._read_register(_HPL_VOL) & 0x7F
         right_gain_u7 = self._page1._read_register(_HPR_VOL) & 0x7F
-        left_db = self._table_6_24_uint7_to_db(left_gain_u7)
-        right_db = self._table_6_24_uint7_to_db(right_gain_u7)
+        left_db = _table_6_24_uint7_to_db(left_gain_u7)
+        right_db = _table_6_24_uint7_to_db(right_gain_u7)
         if left_db == right_db:
             return left_db
         else:
@@ -2156,7 +2155,7 @@ class TLV320DAC3100:
     @headphone_volume.setter
     def headphone_volume(self, db: float) -> None:
         # The table 6-24 lookup function includes min/max range clipping
-        gain_u7 = self._table_6_24_db_to_uint7(db)
+        gain_u7 = _table_6_24_db_to_uint7(db)
         self._page1._set_hpl_volume(route_enabled=True, gain=gain_u7)
         self._page1._set_hpr_volume(route_enabled=True, gain=gain_u7)
 
@@ -2173,12 +2172,12 @@ class TLV320DAC3100:
         affect the speaker output level.
         """
         gain_u7 = self._page1._read_register(_SPK_VOL) & 0x7F
-        return self._table_6_24_uint7_to_db(gain_u7)
+        return _table_6_24_uint7_to_db(gain_u7)
 
     @speaker_volume.setter
     def speaker_volume(self, db: float) -> None:
         # The table 6-24 lookup function includes min/max range clipping
-        gain_u7 = self._table_6_24_uint7_to_dB(db)
+        gain_u7 = _table_6_24_uint7_to_dB(db)
         self._page1._set_spk_volume(route_enabled=True, gain=gain_u7)
 
     @property

@@ -30,7 +30,7 @@ autodoc_mock_imports = ["digitalio", "busio", "adafruit_bus_device", "micropytho
 autodoc_preserve_defaults = True
 
 # Override the default config in which autodoc sorts things alphabetically
-autodoc_member_order = 'groupwise'
+autodoc_member_order = "groupwise"
 
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
@@ -121,7 +121,7 @@ html_theme = "sphinx_rtd_theme"
 html_static_path = ["_static"]
 
 # Include extra css to work around rtd theme glitches
-html_css_files = ['custom.css']
+html_css_files = ["custom.css"]
 
 # The name of an image file (relative to this directory) to use as a favicon of
 # the docs.  This file should be a Windows icon file (.ico) being 16x16 or 32x32
