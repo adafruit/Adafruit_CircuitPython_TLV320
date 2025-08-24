@@ -15,6 +15,25 @@ Implementation Notes
 
 **Hardware:**
 
+* The TLV320DAC chip has moderately complex onboard audio filtering, routing,
+  and amplification capability. Each of the signal chains for speaker, headphone
+  left, and headphone right start with the DAC, then they go through a mixer
+  stage, an analog volume (attenuation) stage, and finally an analog amplifier
+  stage. Parameters for each stage of each signal chain can be separately set
+  with different properties.
+
+* To understand how the different audio stages (DAC, volume, amplifier gain)
+  relate to each other, it can help to look at the Functional Block Diagram in
+  the TLV320DAC3100 datasheet:
+  https://learn.adafruit.com/adafruit-tlv320dac3100-i2s-dac/downloads
+
+* **CAUTION**: The TLV320 speaker amplifier has enough power to easily burn out
+  small 1W speakers if you max out the volume and gain settings. To be safe,
+  start with lower levels for ``speaker_volume`` and ``speaker_gain``, then work
+  your way up to find a comfortable listening level. Similarly, for the
+  headphone output, start low with ``headphone_volume``,
+  ``headphone_left_gain``\, and ``headphone_right_gain``\, then increase as
+  needed.
 
 **Software and Dependencies:**
 
@@ -134,12 +153,6 @@ DAC_ROUTE_NONE = const(0b00)  # DAC not routed
 DAC_ROUTE_MIXER = const(0b01)  # DAC routed to mixer amplifier
 DAC_ROUTE_HP = const(0b10)  # DAC routed directly to HP driver
 
-# Speaker amplifier gain options
-SPK_GAIN_6DB = const(0b00)  # 6 dB gain
-SPK_GAIN_12DB = const(0b01)  # 12 dB gain
-SPK_GAIN_18DB = const(0b10)  # 18 dB gain
-SPK_GAIN_24DB = const(0b11)  # 24 dB gain
-
 # Headphone common mode voltage settings
 HP_COMMON_1_35V = const(0b00)  # Common-mode voltage 1.35V
 HP_COMMON_1_50V = const(0b01)  # Common-mode voltage 1.50V
@@ -160,10 +173,143 @@ BTN_DEBOUNCE_8MS = const(0b01)  # 8ms debounce (1ms clock)
 BTN_DEBOUNCE_16MS = const(0b10)  # 16ms debounce (2ms clock)
 BTN_DEBOUNCE_32MS = const(0b11)  # 32ms debounce (4ms clock)
 
+# Lookup table for speaker_volume and headphone_volume.
+# These are from TLV320DAC3100 datasheet Table 6-24.
+TABLE_6_24 = (
+      0,    #   0  Begin linear segment: round((-1.99 * dB) - 0.2)
+     -0.5,  #   1
+     -1,    #   2
+     -1.5,  #   3
+     -2,    #   4
+     -2.5,  #   5
+     -3,    #   6
+     -3.5,  #   7
+     -4,    #   8
+     -4.5,  #   9
+     -5,    #  10
+     -5.5,  #  11
+     -6,    #  12
+     -6.5,  #  13
+     -7,    #  14
+     -7.5,  #  15
+     -8,    #  16
+     -8.5,  #  17
+     -9,    #  18
+     -9.5,  #  19
+    -10,    #  20
+    -10.5,  #  21
+    -11,    #  22
+    -11.5,  #  23
+    -12,    #  24
+    -12.5,  #  25
+    -13,    #  26
+    -13.5,  #  27
+    -14,    #  28
+    -14.5,  #  29
+    -15,    #  30
+    -15.5,  #  31
+    -16,    #  32
+    -16.5,  #  33
+    -17,    #  34
+    -17.5,  #  35
+    -18.1,  #  36
+    -18.6,  #  37
+    -19.1,  #  38
+    -19.6,  #  39
+    -20.1,  #  40
+    -20.6,  #  41
+    -21.1,  #  42
+    -21.6,  #  43
+    -22.1,  #  44
+    -22.6,  #  45
+    -23.1,  #  46
+    -23.6,  #  47
+    -24.1,  #  48
+    -24.6,  #  49
+    -25.1,  #  50
+    -25.6,  #  51
+    -26.1,  #  52
+    -26.6,  #  53
+    -27.1,  #  54
+    -27.6,  #  55
+    -28.1,  #  56
+    -28.6,  #  57
+    -29.1,  #  58
+    -29.6,  #  59
+    -30.1,  #  60
+    -30.6,  #  61
+    -31.1,  #  62
+    -31.6,  #  63
+    -32.1,  #  64
+    -32.6,  #  65
+    -33.1,  #  66
+    -33.6,  #  67
+    -34.1,  #  68
+    -34.6,  #  69
+    -35.2,  #  70
+    -35.7,  #  71
+    -36.2,  #  72
+    -36.7,  #  73
+    -37.2,  #  74
+    -37.7,  #  75
+    -38.2,  #  76
+    -38.7,  #  77
+    -39.2,  #  78
+    -39.7,  #  79
+    -40.2,  #  80
+    -40.7,  #  81
+    -41.2,  #  82
+    -41.7,  #  83
+    -42.1,  #  84
+    -42.7,  #  85
+    -43.2,  #  86
+    -43.8,  #  87
+    -44.3,  #  88
+    -44.8,  #  89
+    -45.2,  #  90
+    -45.8,  #  91
+    -46.2,  #  92
+    -46.7,  #  93
+    -47.4,  #  94
+    -47.9,  #  95
+    -48.2,  #  96
+    -48.7,  #  97
+    -49.3,  #  98
+    -50,    #  99
+    -50.3,  # 100
+    -51,    # 101
+    -51.4,  # 102
+    -51.8,  # 103
+    -52.2,  # 104
+    -52.7,  # 105  End linear segment: round((-1.99 * dB) - 0.2)
+    -53.7,  # 106  Begin curved segment
+    -54.2,  # 107
+    -55.3,  # 108
+    -56.7,  # 109
+    -58.3,  # 110
+    -60.2,  # 111
+    -62.7,  # 112
+    -64.3,  # 113
+    -66.2,  # 114
+    -68.7,  # 115
+    -72.2,  # 116  End curved segment
+    -78.3,  # 117  Begin constant segment -78.3 dB
+    -78.3,  # 118
+    -78.3,  # 119
+    -78.3,  # 120
+    -78.3,  # 121
+    -78.3,  # 122
+    -78.3,  # 123
+    -78.3,  # 124
+    -78.3,  # 125
+    -78.3,  # 126
+    -78.3,  # 127
+)
+
 # ruff: noqa: PLR0904, PLR0912, PLR0913, PLR0915, PLR0917
 
 
-class PagedRegisterBase:
+class _PagedRegisterBase:
     """Base class for paged register access."""
 
     def __init__(self, i2c_device, page):
@@ -233,7 +379,7 @@ class PagedRegisterBase:
         self._write_register(register, reg_value)
 
 
-class Page0Registers(PagedRegisterBase):
+class _Page0Registers(_PagedRegisterBase):
     """Page 0 registers containing system configuration, clocking, etc."""
 
     def __init__(self, i2c_device):
@@ -629,7 +775,7 @@ class Page0Registers(PagedRegisterBase):
             time.sleep(0.01)
 
 
-class Page1Registers(PagedRegisterBase):
+class _Page1Registers(_PagedRegisterBase):
     """Page 1 registers containing analog output settings, HP/SPK controls, etc."""
 
     def __init__(self, i2c_device):
@@ -707,26 +853,37 @@ class Page1Registers(PagedRegisterBase):
         self._write_register(_SPK_VOL, value)
 
     def _configure_hpl_pga(self, gain_db=0, unmute=True):
-        """HPL driver PGA settings."""
-        if gain_db > 9:
-            raise ValueError("Gain cannot be greater than 9")
+        """HPL driver PGA settings.
+        :raises ValueError: If set to anything outside of range 0 to 9
+        """
+        if not (0 <= gain_db <= 9):
+            raise ValueError("HPL gain must be in range 0 to 9")
         value = (gain_db & 0x0F) << 3
         if unmute:
             value |= 1 << 2
         self._write_register(_HPL_DRIVER, value)
 
     def _configure_hpr_pga(self, gain_db=0, unmute=True):
-        """HPR driver PGA settings."""
-        if gain_db > 9:
-            raise ValueError("Gain cannot be greater than 9")
+        """HPR driver PGA settings.
+        :raises ValueError: If set to anything outside of range 0 to 9
+        """
+        if not (0 <= gain_db <= 9):
+            raise ValueError("HPR gain must be in range 0 to 9")
         value = (gain_db & 0x0F) << 3
         if unmute:
             value |= 1 << 2
         self._write_register(_HPR_DRIVER, value)
 
-    def _configure_spk_pga(self, gain=SPK_GAIN_6DB, unmute=True):
-        """Speaker driver settings."""
-        value = (gain & 0x03) << 3
+    def _configure_spk_pga(self, gain_db=6, unmute=True):
+        """Speaker driver settings.
+        :raises ValueError: If set to anything other than 6, 12, 18, or 24
+        """
+        if gain_db not in (6, 12, 18, 24):
+            raise ValueError(
+                f"Invalid speaker gain: {gain_db}. Must be 6, 12, 18, or 24."
+            )
+        uint2_val = (gain_db / 6) - 1
+        value = (uint2_val & 0x03) << 3
         if unmute:
             value |= 1 << 2
         self._write_register(_SPK_DRIVER, value)
@@ -828,7 +985,7 @@ class Page1Registers(PagedRegisterBase):
         self._write_register(_INPUT_CM, value)
 
 
-class Page3Registers(PagedRegisterBase):
+class _Page3Registers(_PagedRegisterBase):
     """Page 3 registers containing timer settings."""
 
     def __init__(self, i2c_device):
@@ -857,9 +1014,9 @@ class TLV320DAC3100:
         self._device: I2CDevice = I2CDevice(i2c, address)
 
         # Initialize register page classes
-        self._page0: "Page0Registers" = Page0Registers(self._device)
-        self._page1: "Page1Registers" = Page1Registers(self._device)
-        self._page3: "Page3Registers" = Page3Registers(self._device)
+        self._page0: "Page0Registers" = _Page0Registers(self._device)
+        self._page1: "Page1Registers" = _Page1Registers(self._device)
+        self._page3: "Page3Registers" = _Page3Registers(self._device)
         self._sample_rate: int = 44100
         self._bit_depth: int = 16
         self._mclk_freq: int = 0  # Default blck
@@ -877,6 +1034,35 @@ class TLV320DAC3100:
             right_path=DAC_PATH_NORMAL,
         )
         self._page0._set_dac_volume_control(False, False, VOL_INDEPENDENT)
+
+    def _table_6_24_db_to_uint7(self, db: float) -> int:
+        """Convert gain dB to 7-bit unsigned int following datasheet Table 6-24.
+
+        :param db: Analog gain in dB; range is 0 dB (loud) to -78.3 dB (soft)
+        :return: 7-bit unsigned int value, range is 0 (loud) to 127 (soft)
+        """
+        # Clip dB argument to fit in the valid range if it's too big or too small
+        db = max(-78.3, min(0, db))
+        # Loop through the table, looking for the lowest table index where the
+        # target dB value is not greater than the table dB value
+        result = 0
+        for (table_u7, table_db) in enumerate(TABLE_6_24):
+            if db < table_db:
+                result = table_u7
+            elif db == table_db:
+                result = table_u7
+                break
+            else:
+                break
+        return result
+
+    def _table_6_24_uint7_to_db(self, u7: int) -> float:
+        """Convert 7-bit unsigned int to gain dB following datasheet Table 6-24.
+
+        :param u7: 7-bit unsigned int value, range is 0 (loud) to 127 (soft)
+        :return: Analog gain in dB, range is 0 dB (loud) to -78.3 dB (soft)
+        """
+        return TABLE_6_24[max(0, min(127, int(u7)))]
 
     # Basic properties and methods
 
@@ -1256,10 +1442,22 @@ class TLV320DAC3100:
 
     @property
     def dac_volume(self) -> float:
-        """
-        Get the current DAC digital volume in dB.
+        """Current DAC digital volume in dB.
 
-        :return: Volume in dB (-63.5 to 24 dB)
+        Range is -63.5 dB (soft) to 24 dB (loud).
+
+        This acts on two registers at once. In the datasheet, they are:
+
+        * Page 0 / Register 65 (0x41): DAC Left Volume Control
+
+        * Page 0 / Register 66 (0x42): DAC Right Volume Control
+
+        Changing the DAC volume will change the signal level feeding into the
+        analog signal chains of the speaker and both headphone channels. You
+        should also be aware of ``speaker_volume``\, ``speaker_gain``\,
+        ``speaker_mute``\, ``headphone_volume``\, ``headphone_left_gain``\,
+        ``headphone_right_gain``\, ``headphone_left_mute``\, and
+        ``headphone_right_mute``\.
         """
         left_vol = self._page0._read_register(_DAC_LVOL)
         right_vol = self._page0._read_register(_DAC_RVOL)
@@ -1271,11 +1469,6 @@ class TLV320DAC3100:
 
     @dac_volume.setter
     def dac_volume(self, db: float) -> None:
-        """
-        Set the DAC digital volume in dB.
-
-        :param db: Volume in dB (-63.5 to 24 dB)
-        """
         db = max(-63.5, min(24, db))
         reg_val = self._convert_db_to_reg(db)
         self._page0._set_page()
@@ -1337,117 +1530,117 @@ class TLV320DAC3100:
 
     @property
     def headphone_left_gain(self) -> int:
-        """The left headphone gain in dB.
+        """Left headphone amplifier gain in dB.
 
-        :return: Gain value in dB
+        Range is 0 dB (soft) to 9 dB (loud) in steps of 1 dB.
+
+        In the datasheet, this is Page 1 / Register 40 (0x28): HPL Driver.
+
+        Note that the headphone left channel volume is also affected by
+        ``dac_volume``\, ``headphone_volume``\, and ``headphone_left_mute``\.
+
+        :raises ValueError: If set to a value outside the range of 0 to 9
         """
         reg_value = self._page1._read_register(_HPL_DRIVER)
         return (reg_value >> 3) & 0x0F
 
     @headphone_left_gain.setter
     def headphone_left_gain(self, gain_db: int) -> None:
-        """The left headphone gain in dB.
-
-        :param gain_db: Gain value in dB
-        """
         unmute = not self.headphone_left_mute
-        self._page1._configure_hpl_pga(gain_db, unmute)
+        # This call can raise ValueError
+        self._page1._configure_hpl_pga(int(gain_db), unmute)
 
     @property
     def headphone_left_mute(self) -> bool:
-        """The left headphone mute status.
+        """Left headphone mute status.
 
-        :return: True if left headphone is muted, False otherwise
+        True means left headphone is muted, False means not muted.
         """
         reg_value = self._page1._read_register(_HPL_DRIVER)
         return not bool(reg_value & (1 << 2))
 
     @headphone_left_mute.setter
     def headphone_left_mute(self, mute: bool) -> None:
-        """The left headphone mute status.
-
-        :param mute: True to mute left headphone, False to unmute
-        """
         gain = self.headphone_left_gain
+        # This could in theory raise ValueError, but that's very unlikely
         self._page1._configure_hpl_pga(gain, not mute)
 
     @property
     def headphone_right_gain(self) -> int:
-        """The right headphone gain in dB.
+        """Right headphone amplifier gain in dB.
 
-        :return: Gain value in dB
+        Range is 0 dB (soft) to 9 dB (loud) in steps of 1 dB.
+
+        In the datasheet, this is Page 1 / Register 41 (0x29): HPR Driver.
+
+        Note that the headphone right channel volume is also affected by
+        ``dac_volume``\, ``headphone_volume``\, and ``headphone_right_mute``\.
+
+        :raises ValueError: If set to a value outside the range of 0 to 9
         """
         reg_value = self._page1._read_register(_HPR_DRIVER)
         return (reg_value >> 3) & 0x0F
 
     @headphone_right_gain.setter
     def headphone_right_gain(self, gain_db: int) -> None:
-        """The right headphone gain in dB.
-
-        :param gain_db: Gain value in dB
-        """
         unmute = not self.headphone_right_mute
-        self._page1._configure_hpr_pga(gain_db, unmute)
+        # This call can raise ValueError
+        self._page1._configure_hpr_pga(int(gain_db), unmute)
 
     @property
     def headphone_right_mute(self) -> bool:
-        """The right headphone mute status.
+        """Right headphone mute status.
 
-        :return: True if right headphone is muted, False otherwise
+        True means right headphone is muted, False means not muted.
         """
         reg_value = self._page1._read_register(_HPR_DRIVER)
         return not bool(reg_value & (1 << 2))
 
     @headphone_right_mute.setter
     def headphone_right_mute(self, mute: bool) -> None:
-        """The right headphone mute status.
-
-        :param mute: True to mute right headphone, False to unmute
-        """
         gain = self.headphone_right_gain
         self._page1._configure_hpr_pga(gain, not mute)
 
     @property
     def speaker_gain(self) -> int:
-        """The speaker gain setting in dB.
+        """Speaker amplifier gain setting in dB.
 
-        :return: The gain value in dB
+        Range is 6 dB (soft) to 24 dB (loud) in steps of 6 dB.
+
+        In the datasheet, this is Page 1 / Register 42 (0x2A): Class-D Speaker
+        (SPK) Driver.
+
+        Note that ``dac_volume``\, ``speaker_volume``\, and ``speaker_mute``
+        also affect the speaker output level.
+
+        :raises ValueError: If set to anything other than 6, 12, 18, or 24
         """
+        # This gives us a 2-bit unsigned integer where 0 means 6 dB, 1 is 12 dB,
+        # 2 is 18 dB, and 3 is 24 dB
         reg_value = self._page1._read_register(_SPK_DRIVER)
-        return (reg_value >> 3) & 0x03
+        return (((reg_value >> 3) & 0x03) + 1) * 6
 
     @speaker_gain.setter
     def speaker_gain(self, gain_db: int) -> None:
-        """The speaker gain in dB.
-
-        :param gain_db: Speaker gain in dB (6, 12, 18, or 24)
-        :raises ValueError: If gain_db is not a valid value
         """
-        # Convert dB to register value
-        gain_mapping: List[int] = [SPK_GAIN_6DB, SPK_GAIN_12DB, SPK_GAIN_18DB, SPK_GAIN_24DB]
-
-        if gain_db not in gain_mapping:
-            raise ValueError(
-                f"Invalid preset value: {gain_db}. Must be one of the SPK_GAIN_* constants."
-            )
+        :raises ValueError: If set to anything other than 6, 12, 18, or 24
+        """
         unmute = not self.speaker_mute
+        # This relies on _configure_spk_pga() to raise ValueError if the gain
+        # value is out of range
         self._page1._configure_spk_pga(gain_db, unmute)
 
     @property
     def speaker_mute(self) -> bool:
         """The speaker mute status.
 
-        :return: True if speaker is muted, False otherwise
+        True means speaker is muted, False means unmuted.
         """
         reg_value = self._page1._read_register(_SPK_DRIVER)
         return not bool(reg_value & (1 << 2))
 
     @speaker_mute.setter
     def speaker_mute(self, mute: bool) -> None:
-        """The speaker mute status.
-
-        :param mute: True to mute speaker, False to unmute
-        """
         gain = self.speaker_gain
         # Unmute is inverse of mute
         self._page1._configure_spk_pga(gain, not mute)
@@ -1884,7 +2077,7 @@ class TLV320DAC3100:
             self.right_dac_mute = False
             self.left_dac_path = DAC_PATH_NORMAL
             self.right_dac_path = DAC_PATH_NORMAL
-            self.speaker_gain = SPK_GAIN_18DB
+            self.speaker_gain = 6  # safest speaker amp gain option: 6 dB
             self._page1._set_speaker_enabled(True)
             self._page1._configure_analog_inputs(
                 left_dac=DAC_ROUTE_MIXER, right_dac=DAC_ROUTE_MIXER
@@ -1896,60 +2089,56 @@ class TLV320DAC3100:
 
     @property
     def headphone_volume(self) -> float:
-        """The current headphone volume in dB.
-        :return: The volume in dB (0 = max, -78.3 = min)
-        """
-        left_gain = self._page1._read_register(_HPL_VOL) & 0x7F
-        right_gain = self._page1._read_register(_HPR_VOL) & 0x7F
+        """Current headphone analog volume in dB.
 
-        if left_gain == right_gain:
-            db = -left_gain / 2.0
-            db = max(-78.3, min(0, db))
-            return db
+        Range is 0 (loud) to -78.3 (very soft).
+
+        This acts on two registers at once. In the datasheet they are:
+
+        * Page 1 / Register 36 (0x24): Left Analog Volume to HPL
+
+        * Page 1 / Register 37 (0x25) Right Analog Volume to HPR
+
+        Note that headphone output is also affected by ``dac_volume``\,
+        ``headphone_left_gain``\, ``headphone_right_gain``\,
+        ``headphone_left_mute``\, and ``headphone_right_mute``\.
+        """
+        left_gain_u7 = self._page1._read_register(_HPL_VOL) & 0x7F
+        right_gain_u7 = self._page1._read_register(_HPR_VOL) & 0x7F
+        left_db = self._table_6_24_uint7_to_db(left_gain_u7)
+        right_db = self._table_6_24_uint7_to_db(right_gain_u7)
+        if left_db == right_db:
+            return left_db
         else:
-            avg_gain = (left_gain + right_gain) / 2
-            db = -avg_gain / 2.0
-            db = max(-78.3, min(0, db))
-            return db
+            return (left_db + right_db) / 2
 
     @headphone_volume.setter
     def headphone_volume(self, db: float) -> None:
-        """
-        Set headphone volume in dB (0 to -78.3 dB)
-        :param db: Volume in dB (0 = max, -78.3 = min)
-        """
-        if db > 0:
-            db = 0
-        elif db < -78.3:
-            db = -78.3
-        gain = int(-2 * db)
-        gain = max(0, min(gain, 127))
-        self._page1._set_hpl_volume(route_enabled=True, gain=gain)
-        self._page1._set_hpr_volume(route_enabled=True, gain=gain)
+        # The table 6-24 lookup function includes min/max range clipping
+        gain_u7 = self._table_6_24_db_to_uint7(db)
+        self._page1._set_hpl_volume(route_enabled=True, gain=gain_u7)
+        self._page1._set_hpr_volume(route_enabled=True, gain=gain_u7)
 
     @property
     def speaker_volume(self) -> float:
-        """The current speaker volume in dB.
+        """Current speaker analog volume in dB.
 
-        :return: The volume in dB (0 = max, -63.5 = min)
+        Range is 0 (loud) to -78.3 (very soft).
+
+        In the datasheet, this is Page 1 / Register 38 (0x26): Left Analog
+        Volume to SPK.
+
+        Note that ``dac_volume``\, ``speaker_gain``\, and ``speaker_mute`` also
+        affect the speaker output level.
         """
-        gain = self._page1._read_register(_SPK_VOL) & 0x7F
-        # Convert from register value to dB
-        # 55 ≈ 0dB, 0 ≈ -63.5dB
-        db = (gain - 55) / 1.14
-        return db
+        gain_u7 = self._page1._read_register(_SPK_VOL) & 0x7F
+        return self._table_6_24_uint7_to_db(gain_u7)
 
     @speaker_volume.setter
     def speaker_volume(self, db: float) -> None:
-        """
-
-        :param db: Volume in dB (0 = max, -63.5 = min)
-        """
-        if db > 0:
-            db = 0
-        gain = int(55 + (db * 1.14))
-        gain = max(0, min(gain, 127))
-        self._page1._set_spk_volume(route_enabled=True, gain=gain)
+        # The table 6-24 lookup function includes min/max range clipping
+        gain_u7 = self._table_6_24_uint7_to_dB(db)
+        self._page1._set_spk_volume(route_enabled=True, gain=gain_u7)
 
     @property
     def sample_rate(self) -> int:
