@@ -87,7 +87,7 @@ For this one, the default headphone output volume will be way too low for
 use with a device that expects consumer line level input (-10 dBV). To fix
 that, you can increase ``dac_volume`` or ``headphone_volume``. If you want
 to experiment with different ways of setting the levels, check out the
-volume test example: `Volume test <../examples.html#volume-test>`_
+volume test example: `Volume test <./examples.html#volume-test>`_
 
 ::
 
