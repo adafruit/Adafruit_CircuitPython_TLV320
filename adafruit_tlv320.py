@@ -609,7 +609,7 @@ class _Page0Registers(_PagedRegisterBase):
             "wclk_out": wclk_out,
         }
 
-    def _get_dac_data_path(self):
+    def _get_dac_data_path(self) -> dict:
         """The current DAC data path configuration.
 
         :return: Dictionary with DAC data path settings
@@ -629,7 +629,7 @@ class _Page0Registers(_PagedRegisterBase):
             "volume_step": volume_step,
         }
 
-    def _get_dac_volume_control(self):
+    def _get_dac_volume_control(self) -> dict:
         """The current DAC volume control configuration.
 
         :return: Dictionary with volume control settings
@@ -1083,9 +1083,9 @@ class TLV320DAC3100:
         self._device: I2CDevice = I2CDevice(i2c, address)
 
         # Initialize register page classes
-        self._page0: "Page0Registers" = _Page0Registers(self._device)
-        self._page1: "Page1Registers" = _Page1Registers(self._device)
-        self._page3: "Page3Registers" = _Page3Registers(self._device)
+        self._page0: "_Page0Registers" = _Page0Registers(self._device)
+        self._page1: "_Page1Registers" = _Page1Registers(self._device)
+        self._page3: "_Page3Registers" = _Page3Registers(self._device)
         self._sample_rate: int = 44100
         self._bit_depth: int = 16
         self._mclk_freq: int = 0  # Default blck
@@ -1198,7 +1198,7 @@ class TLV320DAC3100:
 
     @left_dac.setter
     def left_dac(self, enabled: bool) -> None:
-        current: DACDataPath = self._page0._get_dac_data_path()
+        current: dict = self._page0._get_dac_data_path()
         self._page0._set_dac_data_path(
             enabled,
             current["right_dac_on"],
@@ -1220,7 +1220,7 @@ class TLV320DAC3100:
 
     @right_dac.setter
     def right_dac(self, enabled: bool) -> None:
-        current: DACDataPath = self._page0._get_dac_data_path()
+        current: dict = self._page0._get_dac_data_path()
         self._page0._set_dac_data_path(
             current["left_dac_on"],
             enabled,
@@ -1250,7 +1250,7 @@ class TLV320DAC3100:
                 f"Invalid DAC path value: {path}. Must be one of the DAC_PATH_* constants."
             )
 
-        current: DACDataPath = self._page0._get_dac_data_path()
+        current: dict = self._page0._get_dac_data_path()
         self._page0._set_dac_data_path(
             current["left_dac_on"],
             current["right_dac_on"],
@@ -1280,7 +1280,7 @@ class TLV320DAC3100:
                 f"Invalid DAC path value: {path}. Must be one of the DAC_PATH_* constants."
             )
 
-        current: DACDataPath = self._page0._get_dac_data_path()
+        current: dict = self._page0._get_dac_data_path()
         self._page0._set_dac_data_path(
             current["left_dac_on"],
             current["right_dac_on"],
@@ -1310,7 +1310,7 @@ class TLV320DAC3100:
                 f"Invalid volume step value: {step}. Must be one of the VOLUME_STEP_* constants."
             )
 
-        current: DACDataPath = self._page0._get_dac_data_path()
+        current: dict = self._page0._get_dac_data_path()
         self._page0._set_dac_data_path(
             current["left_dac_on"],
             current["right_dac_on"],
@@ -1368,7 +1368,7 @@ class TLV320DAC3100:
 
     @left_dac_mute.setter
     def left_dac_mute(self, mute: bool) -> None:
-        current: DACVolumeControl = self._page0._get_dac_volume_control()
+        current: dict = self._page0._get_dac_volume_control()
         self._page0._set_dac_volume_control(mute, current["right_mute"], current["control"])
 
     @property
@@ -1384,7 +1384,7 @@ class TLV320DAC3100:
 
     @right_dac_mute.setter
     def right_dac_mute(self, mute: bool) -> None:
-        current: DACVolumeControl = self._page0._get_dac_volume_control()
+        current: dict = self._page0._get_dac_volume_control()
         self._page0._set_dac_volume_control(current["left_mute"], mute, current["control"])
 
     @property
@@ -1406,7 +1406,7 @@ class TLV320DAC3100:
             raise ValueError(
                 f"Invalid volume control mode: {mode}. Must be one of the VOL_* constants."
             )
-        current: DACVolumeControl = self._page0._get_dac_volume_control()
+        current: dict = self._page0._get_dac_volume_control()
         self._page0._set_dac_volume_control(current["left_mute"], current["right_mute"], mode)
 
     @property
@@ -2201,7 +2201,7 @@ class TLV320DAC3100:
     @speaker_volume.setter
     def speaker_volume(self, db: float) -> None:
         # The table 6-24 lookup function includes min/max range clipping
-        gain_u7 = _table_6_24_uint7_to_dB(db)
+        gain_u7 = _table_6_24_uint7_to_db(db)
         self._page1._set_spk_volume(route_enabled=True, gain=gain_u7)
 
     @property
