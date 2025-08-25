@@ -36,7 +36,7 @@ Implementation Notes
   start with lower levels for ``speaker_volume`` and ``speaker_gain``, then work
   your way up to find a comfortable listening level. Similarly, for the
   headphone output, start low with ``headphone_volume``,
-  ``headphone_left_gain``\, and ``headphone_right_gain``\, then increase as
+  ``headphone_left_gain``, and ``headphone_right_gain``, then increase as
   needed.
 
 **Software and Dependencies:**
@@ -1481,10 +1481,10 @@ class TLV320DAC3100:
 
         Changing the DAC volume will change the signal level feeding into the
         analog signal chains of the speaker and both headphone channels. You
-        should also be aware of ``speaker_volume``\, ``speaker_gain``\,
-        ``speaker_mute``\, ``headphone_volume``\, ``headphone_left_gain``\,
-        ``headphone_right_gain``\, ``headphone_left_mute``\, and
-        ``headphone_right_mute``\.
+        should also be aware of ``speaker_volume``, ``speaker_gain``,
+        ``speaker_mute``, ``headphone_volume``, ``headphone_left_gain``,
+        ``headphone_right_gain``, ``headphone_left_mute``, and
+        ``headphone_right_mute``.
 
         :getter: Return volume
         :setter: Set volume
@@ -1567,7 +1567,7 @@ class TLV320DAC3100:
         In the datasheet, this is Page 1 / Register 40 (0x28): HPL Driver.
 
         Note that the headphone left channel volume is also affected by
-        ``dac_volume``\, ``headphone_volume``\, and ``headphone_left_mute``\.
+        ``dac_volume``, ``headphone_volume``, and ``headphone_left_mute``.
 
         :getter: Return gain
         :setter: Set gain
@@ -1609,7 +1609,7 @@ class TLV320DAC3100:
         In the datasheet, this is Page 1 / Register 41 (0x29): HPR Driver.
 
         Note that the headphone right channel volume is also affected by
-        ``dac_volume``\, ``headphone_volume``\, and ``headphone_right_mute``\.
+        ``dac_volume``, ``headphone_volume``, and ``headphone_right_mute``.
 
         :getter: Return gain
         :setter: Set gain
@@ -1650,7 +1650,7 @@ class TLV320DAC3100:
         In the datasheet, this is Page 1 / Register 42 (0x2A): Class-D Speaker
         (SPK) Driver.
 
-        Note that ``dac_volume``\, ``speaker_volume``\, and ``speaker_mute``
+        Note that ``dac_volume``, ``speaker_volume``, and ``speaker_mute``
         also affect the speaker output level.
 
         :getter: Return gain
@@ -2173,9 +2173,9 @@ class TLV320DAC3100:
         * Page 1 / Register 36 (0x24): Left Analog Volume to HPL
         * Page 1 / Register 37 (0x25) Right Analog Volume to HPR
 
-        Note that headphone output is also affected by ``dac_volume``\,
-        ``headphone_left_gain``\, ``headphone_right_gain``\,
-        ``headphone_left_mute``\, and ``headphone_right_mute``\.
+        Note that headphone output is also affected by ``dac_volume``,
+        ``headphone_left_gain``, ``headphone_right_gain``,
+        ``headphone_left_mute``, and ``headphone_right_mute``.
 
         :getter: Return volume
         :setter: Set volume
@@ -2205,7 +2205,7 @@ class TLV320DAC3100:
         In the datasheet, this is Page 1 / Register 38 (0x26): Left Analog
         Volume to SPK.
 
-        Note that ``dac_volume``\, ``speaker_gain``\, and ``speaker_mute`` also
+        Note that ``dac_volume``, ``speaker_gain``, and ``speaker_mute`` also
         affect the speaker output level.
 
         :getter: Return volume
