@@ -2068,8 +2068,8 @@ class TLV320DAC3100:
         are intended for listening at a quiet-ish level with sensitive low
         impedance earbuds:
 
-        * dac_volume = -30
-        * headphone_volume = -42.1
+        * dac_volume = -20
+        * headphone_volume = -51.8
         * headphone_left_gain = headphone_right_gain = 0
 
         If you set this to False, the setter turns off the headphone amp.
@@ -2091,8 +2091,8 @@ class TLV320DAC3100:
         if enabled:
             self.left_dac = True
             self.right_dac = True
-            self.left_dac_channel_volume = -30
-            self.right_dac_channel_volume = -30
+            self.left_dac_channel_volume = -20
+            self.right_dac_channel_volume = -20
             self.left_dac_mute = False
             self.right_dac_mute = False
             self.left_dac_path = DAC_PATH_NORMAL
@@ -2102,7 +2102,7 @@ class TLV320DAC3100:
             self._page1._configure_headphone_driver(
                 left_powered=True, right_powered=True, common=HP_COMMON_1_65V
             )
-            self.headphone_volume = -42.1
+            self.headphone_volume = -52.8
             # NOTE: If you use DAC_ROUTE_HP here instead of DAC_ROUTE_MIXER,
             # the DAC output will bypass the headphone analog volume
             # attenuation stage and go straight into the headphone amp. That
@@ -2123,10 +2123,12 @@ class TLV320DAC3100:
     def speaker_output(self) -> bool:
         """Speaker output helper with quickstart default settings.
 
-        If you set this property to True, the setter will set:
+        If you set this property to True, the setter will set defaults intended
+        for a relatively quiet listening level using the 8Ω 1W mini speaker
+        that comes bundled with the Fruit Jam:
 
-        * dac_volume = -30
-        * speaker_volume = -42.1
+        * dac_volume = -20
+        * speaker_volume = -20.1
         * speaker_gain = 6
 
         If you set this to False, the setter turns off the speaker amp.
@@ -2144,8 +2146,8 @@ class TLV320DAC3100:
         if enabled:
             self.left_dac = True
             self.right_dac = True
-            self.left_dac_channel_volume = -30
-            self.right_dac_channel_volume = -30
+            self.left_dac_channel_volume = -20
+            self.right_dac_channel_volume = -20
             self.left_dac_mute = False
             self.right_dac_mute = False
             self.left_dac_path = DAC_PATH_NORMAL
@@ -2155,7 +2157,7 @@ class TLV320DAC3100:
             self._page1._configure_analog_inputs(
                 left_dac=DAC_ROUTE_MIXER, right_dac=DAC_ROUTE_MIXER
             )
-            self.speaker_volume = -42.1
+            self.speaker_volume = -20.1
             self.speaker_mute = False
         else:
             self._page1._set_speaker_enabled(False)
@@ -2215,7 +2217,7 @@ class TLV320DAC3100:
     @speaker_volume.setter
     def speaker_volume(self, db: float) -> None:
         # The table 6-24 lookup function includes min/max range clipping
-        gain_u7 = _table_6_24_uint7_to_db(db)
+        gain_u7 = _table_6_24_db_to_uint7(db)
         self._page1._set_spk_volume(route_enabled=True, gain=gain_u7)
 
     @property
