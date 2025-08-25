@@ -349,7 +349,7 @@ TABLE_6_24 = (
 )
 
 
-def _table_6_24_db_to_uint7(self, db: float) -> int:
+def _table_6_24_db_to_uint7(db: float) -> int:
     """Convert gain dB to 7-bit unsigned int following datasheet Table 6-24.
 
     :param db: Analog gain in dB; range is 0 dB (loud) to -78.3 dB (soft)
@@ -371,7 +371,7 @@ def _table_6_24_db_to_uint7(self, db: float) -> int:
     return result
 
 
-def _table_6_24_uint7_to_db(self, u7: int) -> float:
+def _table_6_24_uint7_to_db(u7: int) -> float:
     """Convert 7-bit unsigned int to gain dB following datasheet Table 6-24.
 
     :param u7: 7-bit unsigned int value, range is 0 (loud) to 127 (soft)
@@ -951,7 +951,7 @@ class _Page1Registers(_PagedRegisterBase):
         """
         if gain_db not in set((6, 12, 18, 24)):
             raise ValueError(f"Invalid speaker gain: {gain_db}. Must be 6, 12, 18, or 24.")
-        uint2_val = (gain_db / 6) - 1
+        uint2_val = int((gain_db / 6) - 1)
         value = (uint2_val & 0x03) << 3
         if unmute:
             value |= 1 << 2
