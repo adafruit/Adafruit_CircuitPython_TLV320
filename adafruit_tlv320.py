@@ -2062,7 +2062,17 @@ class TLV320DAC3100:
 
     @property
     def headphone_output(self) -> bool:
-        """Headphone output helper with quickstart settings for users.
+        """Headphone output helper with quickstart default settings.
+
+        If you set this property to True, the setter will set defaults that
+        are intended for listening at a quiet-ish level with sensitive low
+        impedance earbuds:
+
+        * dac_volume = -30
+        * headphone_volume = -42.1
+        * headphone_left_gain = headphone_right_gain = 0
+
+        If you set this to False, the setter turns off the headphone amp.
 
         :getter: Return headphone output state: True if either left or right
             headphone amplifier is powered, False otherwise.
@@ -2078,17 +2088,11 @@ class TLV320DAC3100:
 
     @headphone_output.setter
     def headphone_output(self, enabled: bool) -> None:
-        # =========
-        # TODO: Consider if this should be changed to a regular function since
-        #       it modifies many properties. Note how the getter above only
-        #       checks the amplifier enable status but this setter does a bunch
-        #       of other stuff.
-        # =========
         if enabled:
             self.left_dac = True
             self.right_dac = True
-            self.left_dac_channel_volume = 0
-            self.right_dac_channel_volume = 0
+            self.left_dac_channel_volume = -30
+            self.right_dac_channel_volume = -30
             self.left_dac_mute = False
             self.right_dac_mute = False
             self.left_dac_path = DAC_PATH_NORMAL
@@ -2098,10 +2102,18 @@ class TLV320DAC3100:
             self._page1._configure_headphone_driver(
                 left_powered=True, right_powered=True, common=HP_COMMON_1_65V
             )
-            # ========
-            # TODO: Should probably set self.headphone_volume (-10? -20?)
-            # ========
-            self._page1._configure_analog_inputs(left_dac=DAC_ROUTE_HP, right_dac=DAC_ROUTE_HP)
+            self.headphone_volume = -42.1
+            # NOTE: If you use DAC_ROUTE_HP here instead of DAC_ROUTE_MIXER,
+            # the DAC output will bypass the headphone analog volume
+            # attenuation stage and go straight into the headphone amp. That
+            # might possibly be useful to save power, but it reduces your gain
+            # adjustment options. For low impedance headphones, it's helpful to
+            # have a lot of attenuation between the DAC and the headphone amp.
+            # Otherwise, you may have to operate the DAC volume setting down
+            # near the bottom of its usable range.
+            self._page1._configure_analog_inputs(
+                left_dac=DAC_ROUTE_MIXER, right_dac=DAC_ROUTE_MIXER
+            )
             self.headphone_left_mute = False
             self.headphone_right_mute = False
         else:
@@ -2109,7 +2121,15 @@ class TLV320DAC3100:
 
     @property
     def speaker_output(self) -> bool:
-        """Speaker output helper with quickstart settings for users.
+        """Speaker output helper with quickstart default settings.
+
+        If you set this property to True, the setter will set:
+
+        * dac_volume = -30
+        * speaker_volume = -42.1
+        * speaker_gain = 6
+
+        If you set this to False, the setter turns off the speaker amp.
 
         :getter: Return speaker output state: True if speaker amplifier is
             powered, False otherwise.
@@ -2121,17 +2141,11 @@ class TLV320DAC3100:
 
     @speaker_output.setter
     def speaker_output(self, enabled: bool) -> None:
-        # =========
-        # TODO: Consider if this should be changed to a regular function since
-        #       it modifies many properties. Note how the getter above only
-        #       checks the amplifier enable status but this setter does a bunch
-        #       of other stuff.
-        # =========
         if enabled:
             self.left_dac = True
             self.right_dac = True
-            self.left_dac_channel_volume = 0
-            self.right_dac_channel_volume = 0
+            self.left_dac_channel_volume = -30
+            self.right_dac_channel_volume = -30
             self.left_dac_mute = False
             self.right_dac_mute = False
             self.left_dac_path = DAC_PATH_NORMAL
@@ -2141,7 +2155,7 @@ class TLV320DAC3100:
             self._page1._configure_analog_inputs(
                 left_dac=DAC_ROUTE_MIXER, right_dac=DAC_ROUTE_MIXER
             )
-            self.speaker_volume = -20
+            self.speaker_volume = -42.1
             self.speaker_mute = False
         else:
             self._page1._set_speaker_enabled(False)
