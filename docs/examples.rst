@@ -15,3 +15,12 @@ Demos advanced features of the library.
 .. literalinclude:: ../examples/tlv320_fulltest.py
     :caption: examples/tlv320_fulltest.py
     :linenos:
+
+Volume test
+-----------
+
+Test tone generator with interactive serial console volume controls
+
+.. literalinclude:: ../examples/tlv320_volumetest.py
+    :caption: examples/tlv320_volumetest.py
+    :linenos:

@@ -8,13 +8,35 @@
 CircuitPython driver for the TLV320DAC3100 I2S DAC
 
 
-* Author(s): Liz Clark
+* Author(s): Liz Clark, Sam Blenny
 
 Implementation Notes
 --------------------
 
 **Hardware:**
 
+* `Adafruit TLV320DAC3100 - I2S DAC <https://www.adafruit.com/product/6309>`_
+
+* `Adafruit Fruit Jam <https://www.adafruit.com/product/6200>`_
+
+* The TLV320DAC chip has moderately complex onboard audio filtering, routing,
+  and amplification capability. Each of the signal chains for speaker, headphone
+  left, and headphone right start with the DAC, then they go through a mixer
+  stage, an analog volume (attenuation) stage, and finally an analog amplifier
+  stage. Parameters for each stage of each signal chain can be separately set
+  with different properties. But, you can ignore most of that if you use
+  ``speaker_output = True`` or ``headphone_output = True`` to load defaults.
+
+* To understand how the different audio stages (DAC, volume, amplifier gain)
+  relate to each other, it can help to look at the Functional Block Diagram in
+  the TLV320DAC3100 datasheet:
+  https://learn.adafruit.com/adafruit-tlv320dac3100-i2s-dac/downloads
+
+* **CAUTION**: The TLV320 amplifiers have enough power to easily burn out
+  small 1W speakers or drive headphones to levels that could damage your
+  hearing. To be safe, start with low volume and gain levels, then increase
+  them carefully to find a comfortable listening level. This is why the
+  default levels set by speaker_output and headphone_output are relatively low.
 
 **Software and Dependencies:**
 
@@ -22,6 +44,68 @@ Implementation Notes
   https://circuitpython.org/downloads
 
 * Adafruit's Bus Device library: https://github.com/adafruit/Adafruit_CircuitPython_BusDevice
+
+Usage Examples
+--------------
+
+Fruit Jam Mini-Speaker
+^^^^^^^^^^^^^^^^^^^^^^
+
+This will start you off with a relatively low volume for the Fruit Jam's
+bundled 8-Ohm 1 Watt speaker. Your code can adjust the volume by increasing
+or decreasing ``dac_volume``. To use a higher wattage speaker that needs
+more power, you might want to increase ``speaker_volume``.
+
+::
+
+    dac = TLV320DAC3100(board.I2C())
+    dac.speaker_output = True            # set defaults for speaker
+    dac.dac_volume = dac.dac_volume + 1  # increase volume by 1 dB
+    dac.dac_volume = dac.dac_volume - 1  # decrease volume by 1 dB
+
+Low Impedance Earbuds
+^^^^^^^^^^^^^^^^^^^^^
+
+This will start you off with a relatively low volume for low impedance
+earbuds (e.g. JVC Gumy) plugged into the Fruit Jam's headphone jack. Your
+code can adjust the volume by increasing or decreasing ``dac_volume``. To
+use high impedance headphones that need more power, you might want to
+increase ``headphone_volume``.
+
+::
+
+    dac = TLV320DAC3100(board.I2C())
+    dac.speaker_output = False           # make sure speaker amp is off
+    dac.headphone_output = True          # set defaults for headphones
+    dac.dac_volume = dac.dac_volume + 1  # increase volume by 1 dB
+    dac.dac_volume = dac.dac_volume - 1  # decrease volume by 1 dB
+
+Line Level Output to Mixer
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+For this one, the default headphone output volume will be way too low for
+use with a device that expects consumer line level input (-10 dBV). To fix
+that, you can increase ``dac_volume`` or ``headphone_volume``. If you want
+to experiment with different ways of setting the levels, check out the
+volume test example: `Volume test <../examples.html#volume-test>`_
+
+::
+
+    dac = TLV320DAC3100(board.I2C())
+    dac.speaker_output = False    # make sure speaker amp is off
+    dac.headphone_output = True   # set defaults for headphones (note: too low!)
+
+    # Make it louder by increasing headphone_volume. We could also use
+    # dac_volume, but doing it this way gives a better balance between
+    # the speaker signal chain and the headphone jack signal chain. (think
+    # of headphone_volume as a mixer channel's pad switch or gain trim knob
+    # and dac_volume as the main volume control fader)
+    #
+    # CAUTION: This will be *way* too loud for earbuds, please be careful!
+    dac.headphone_volume = -15.5  # default is -51.8 dB
+
+API
+---
 """
 
 import time
@@ -103,67 +187,261 @@ DATA_LEN_24 = const(0b10)  # 24 bits
 DATA_LEN_32 = const(0b11)  # 32 bits
 
 # GPIO1 pin mode options
-GPIO1_DISABLED = const(0b0000)  # GPIO1 disabled (input and output buffers powered down)
-GPIO1_INPUT_MODE = const(0b0001)  # Input mode (secondary BCLK/WCLK/DIN input or ClockGen)
-GPIO1_GPI = const(0b0010)  # General-purpose input
-GPIO1_GPO = const(0b0011)  # General-purpose output
-GPIO1_CLKOUT = const(0b0100)  # CLKOUT output
-GPIO1_INT1 = const(0b0101)  # INT1 output
-GPIO1_INT2 = const(0b0110)  # INT2 output
-GPIO1_BCLK_OUT = const(0b1000)  # Secondary BCLK output for codec interface
-GPIO1_WCLK_OUT = const(0b1001)  # Secondary WCLK output for codec interface
+#: GPIO1 pin mode options: GPIO1 disabled (input and output buffers powered down)
+GPIO1_DISABLED = const(0b0000)
+#: GPIO1 pin mode options: Input mode (secondary BCLK/WCLK/DIN input or ClockGen)
+GPIO1_INPUT_MODE = const(0b0001)
+#: GPIO1 pin mode options: General-purpose input
+GPIO1_GPI = const(0b0010)
+#: GPIO1 pin mode options: General-purpose output
+GPIO1_GPO = const(0b0011)
+#: GPIO1 pin mode options: CLKOUT output
+GPIO1_CLKOUT = const(0b0100)
+#: GPIO1 pin mode options: INT1 output
+GPIO1_INT1 = const(0b0101)
+#: GPIO1 pin mode options: INT2 output
+GPIO1_INT2 = const(0b0110)
+#: GPIO1 pin mode options: Secondary BCLK output for codec interface
+GPIO1_BCLK_OUT = const(0b1000)
+#: GPIO1 pin mode options: Secondary WCLK output for codec interface
+GPIO1_WCLK_OUT = const(0b1001)
 
 # DAC channel data path options
-DAC_PATH_OFF = const(0b00)  # DAC data path off
-DAC_PATH_NORMAL = const(0b01)  # Normal path (L->L or R->R)
-DAC_PATH_SWAPPED = const(0b10)  # Swapped path (R->L or L->R)
-DAC_PATH_MIXED = const(0b11)  # Mixed L+R path
+#: DAC channel data path option: DAC data path off
+DAC_PATH_OFF = const(0b00)
+#: DAC channel data path option: Normal path (L->L or R->R)
+DAC_PATH_NORMAL = const(0b01)
+#: DAC channel data path option: Swapped path (R->L or L->R)
+DAC_PATH_SWAPPED = const(0b10)
+#: DAC channel data path option: Mixed L+R path
+DAC_PATH_MIXED = const(0b11)
 
 # DAC volume control soft stepping options
-VOLUME_STEP_1SAMPLE = const(0b00)  # One step per sample
-VOLUME_STEP_2SAMPLE = const(0b01)  # One step per two samples
-VOLUME_STEP_DISABLED = const(0b10)  # Soft stepping disabled
+#: DAC volume control soft stepping option: One step per sample
+VOLUME_STEP_1SAMPLE = const(0b00)
+#: DAC volume control soft stepping option: One step per two samples
+VOLUME_STEP_2SAMPLE = const(0b01)
+#: DAC volume control soft stepping option: Soft stepping disabled
+VOLUME_STEP_DISABLED = const(0b10)
 
 # DAC volume control configuration options
-VOL_INDEPENDENT = const(0b00)  # Left and right channels independent
-VOL_LEFT_TO_RIGHT = const(0b01)  # Left follows right volume
-VOL_RIGHT_TO_LEFT = const(0b10)  # Right follows left volume
+#: DAC volume control configuration option: Left and right channels independent
+VOL_INDEPENDENT = const(0b00)
+#: DAC volume control configuration option: Left follows right volume
+VOL_LEFT_TO_RIGHT = const(0b01)
+#: DAC volume control configuration option: Right follows left volume
+VOL_RIGHT_TO_LEFT = const(0b10)
 
 # DAC output routing options
-DAC_ROUTE_NONE = const(0b00)  # DAC not routed
-DAC_ROUTE_MIXER = const(0b01)  # DAC routed to mixer amplifier
-DAC_ROUTE_HP = const(0b10)  # DAC routed directly to HP driver
+#: DAC output routing option: DAC not routed
+DAC_ROUTE_NONE = const(0b00)
+#: DAC output routing option: DAC routed to mixer amplifier
+DAC_ROUTE_MIXER = const(0b01)
+#: DAC output routing option: DAC routed directly to HP driver
+DAC_ROUTE_HP = const(0b10)
 
-# Speaker amplifier gain options
-SPK_GAIN_6DB = const(0b00)  # 6 dB gain
-SPK_GAIN_12DB = const(0b01)  # 12 dB gain
-SPK_GAIN_18DB = const(0b10)  # 18 dB gain
-SPK_GAIN_24DB = const(0b11)  # 24 dB gain
-
-# Headphone common mode voltage settings
-HP_COMMON_1_35V = const(0b00)  # Common-mode voltage 1.35V
-HP_COMMON_1_50V = const(0b01)  # Common-mode voltage 1.50V
-HP_COMMON_1_65V = const(0b10)  # Common-mode voltage 1.65V
-HP_COMMON_1_80V = const(0b11)  # Common-mode voltage 1.80V
+# Headphone common mode voltage options
+#: Headphone common mode voltage option: Common-mode voltage 1.35V
+HP_COMMON_1_35V = const(0b00)
+#: Headphone common mode voltage option: Common-mode voltage 1.50V
+HP_COMMON_1_50V = const(0b01)
+#: Headphone common mode voltage option: Common-mode voltage 1.65V
+HP_COMMON_1_65V = const(0b10)
+#: Headphone common mode voltage option: Common-mode voltage 1.80V
+HP_COMMON_1_80V = const(0b11)
 
 # Headset detection debounce time options
-DEBOUNCE_16MS = const(0b000)  # 16ms debounce (2ms clock)
-DEBOUNCE_32MS = const(0b001)  # 32ms debounce (4ms clock)
-DEBOUNCE_64MS = const(0b010)  # 64ms debounce (8ms clock)
-DEBOUNCE_128MS = const(0b011)  # 128ms debounce (16ms clock)
-DEBOUNCE_256MS = const(0b100)  # 256ms debounce (32ms clock)
-DEBOUNCE_512MS = const(0b101)  # 512ms debounce (64ms clock)
+#: Headset detection debounce time option: 16ms debounce (2ms clock)
+DEBOUNCE_16MS = const(0b000)
+#: Headset detection debounce time option: 32ms debounce (4ms clock)
+DEBOUNCE_32MS = const(0b001)
+#: Headset detection debounce time option: 64ms debounce (8ms clock)
+DEBOUNCE_64MS = const(0b010)
+#: Headset detection debounce time option: 128ms debounce (16ms clock)
+DEBOUNCE_128MS = const(0b011)
+#: Headset detection debounce time option: 256ms debounce (32ms clock)
+DEBOUNCE_256MS = const(0b100)
+#: Headset detection debounce time option: 512ms debounce (64ms clock)
+DEBOUNCE_512MS = const(0b101)
 
 # Button press debounce time options
-BTN_DEBOUNCE_0MS = const(0b00)  # No debounce
-BTN_DEBOUNCE_8MS = const(0b01)  # 8ms debounce (1ms clock)
-BTN_DEBOUNCE_16MS = const(0b10)  # 16ms debounce (2ms clock)
-BTN_DEBOUNCE_32MS = const(0b11)  # 32ms debounce (4ms clock)
+#: Button press debounce time option: No debounce
+BTN_DEBOUNCE_0MS = const(0b00)
+#: Button press debounce time option: 8ms debounce (1ms clock)
+BTN_DEBOUNCE_8MS = const(0b01)
+#: Button press debounce time option: 16ms debounce (2ms clock)
+BTN_DEBOUNCE_16MS = const(0b10)
+#: Button press debounce time option: 32ms debounce (4ms clock)
+BTN_DEBOUNCE_32MS = const(0b11)
 
 # ruff: noqa: PLR0904, PLR0912, PLR0913, PLR0915, PLR0917
 
+# Lookup table for speaker_volume and headphone_volume.
+# These are from TLV320DAC3100 datasheet Table 6-24.
+TABLE_6_24 = (
+    0,  #       0  Begin linear segment: round((-1.99 * dB) - 0.2)
+    -0.5,  #    1
+    -1,  #      2
+    -1.5,  #    3
+    -2,  #      4
+    -2.5,  #    5
+    -3,  #      6
+    -3.5,  #    7
+    -4,  #      8
+    -4.5,  #    9
+    -5,  #     10
+    -5.5,  #   11
+    -6,  #     12
+    -6.5,  #   13
+    -7,  #     14
+    -7.5,  #   15
+    -8,  #     16
+    -8.5,  #   17
+    -9,  #     18
+    -9.5,  #   19
+    -10,  #    20
+    -10.5,  #  21
+    -11,  #    22
+    -11.5,  #  23
+    -12,  #    24
+    -12.5,  #  25
+    -13,  #    26
+    -13.5,  #  27
+    -14,  #    28
+    -14.5,  #  29
+    -15,  #    30
+    -15.5,  #  31
+    -16,  #    32
+    -16.5,  #  33
+    -17,  #    34
+    -17.5,  #  35
+    -18.1,  #  36
+    -18.6,  #  37
+    -19.1,  #  38
+    -19.6,  #  39
+    -20.1,  #  40
+    -20.6,  #  41
+    -21.1,  #  42
+    -21.6,  #  43
+    -22.1,  #  44
+    -22.6,  #  45
+    -23.1,  #  46
+    -23.6,  #  47
+    -24.1,  #  48
+    -24.6,  #  49
+    -25.1,  #  50
+    -25.6,  #  51
+    -26.1,  #  52
+    -26.6,  #  53
+    -27.1,  #  54
+    -27.6,  #  55
+    -28.1,  #  56
+    -28.6,  #  57
+    -29.1,  #  58
+    -29.6,  #  59
+    -30.1,  #  60
+    -30.6,  #  61
+    -31.1,  #  62
+    -31.6,  #  63
+    -32.1,  #  64
+    -32.6,  #  65
+    -33.1,  #  66
+    -33.6,  #  67
+    -34.1,  #  68
+    -34.6,  #  69
+    -35.2,  #  70
+    -35.7,  #  71
+    -36.2,  #  72
+    -36.7,  #  73
+    -37.2,  #  74
+    -37.7,  #  75
+    -38.2,  #  76
+    -38.7,  #  77
+    -39.2,  #  78
+    -39.7,  #  79
+    -40.2,  #  80
+    -40.7,  #  81
+    -41.2,  #  82
+    -41.7,  #  83
+    -42.1,  #  84
+    -42.7,  #  85
+    -43.2,  #  86
+    -43.8,  #  87
+    -44.3,  #  88
+    -44.8,  #  89
+    -45.2,  #  90
+    -45.8,  #  91
+    -46.2,  #  92
+    -46.7,  #  93
+    -47.4,  #  94
+    -47.9,  #  95
+    -48.2,  #  96
+    -48.7,  #  97
+    -49.3,  #  98
+    -50,  #    99
+    -50.3,  # 100
+    -51,  #   101
+    -51.4,  # 102
+    -51.8,  # 103
+    -52.2,  # 104
+    -52.7,  # 105  End linear segment: round((-1.99 * dB) - 0.2)
+    -53.7,  # 106  Begin curved segment
+    -54.2,  # 107
+    -55.3,  # 108
+    -56.7,  # 109
+    -58.3,  # 110
+    -60.2,  # 111
+    -62.7,  # 112
+    -64.3,  # 113
+    -66.2,  # 114
+    -68.7,  # 115
+    -72.2,  # 116  End curved segment
+    -78.3,  # 117  Begin constant segment -78.3 dB
+    -78.3,  # 118
+    -78.3,  # 119
+    -78.3,  # 120
+    -78.3,  # 121
+    -78.3,  # 122
+    -78.3,  # 123
+    -78.3,  # 124
+    -78.3,  # 125
+    -78.3,  # 126
+    -78.3,  # 127
+)
 
-class PagedRegisterBase:
+
+def _table_6_24_db_to_uint7(db: float) -> int:
+    """Convert gain dB to 7-bit unsigned int following datasheet Table 6-24.
+
+    :param db: Analog gain in dB; range is 0 dB (loud) to -78.3 dB (soft)
+    :return: 7-bit unsigned int value, range is 0 (loud) to 127 (soft)
+    """
+    # Clip dB argument to fit in the valid range if it's too big or too small
+    db = max(-78.3, min(0, db))
+    # Loop through the table, looking for the lowest table index where the
+    # target dB value is not greater than the table dB value
+    result = 0
+    for table_u7, table_db in enumerate(TABLE_6_24):
+        if db < table_db:
+            result = table_u7
+        elif db == table_db:
+            result = table_u7
+            break
+        else:
+            break
+    return result
+
+
+def _table_6_24_uint7_to_db(u7: int) -> float:
+    """Convert 7-bit unsigned int to gain dB following datasheet Table 6-24.
+
+    :param u7: 7-bit unsigned int value, range is 0 (loud) to 127 (soft)
+    :return: Analog gain in dB, range is 0 dB (loud) to -78.3 dB (soft)
+    """
+    return TABLE_6_24[max(0, min(127, int(u7)))]
+
+
+class _PagedRegisterBase:
     """Base class for paged register access."""
 
     def __init__(self, i2c_device, page):
@@ -233,7 +511,7 @@ class PagedRegisterBase:
         self._write_register(register, reg_value)
 
 
-class Page0Registers(PagedRegisterBase):
+class _Page0Registers(_PagedRegisterBase):
     """Page 0 registers containing system configuration, clocking, etc."""
 
     def __init__(self, i2c_device):
@@ -392,7 +670,7 @@ class Page0Registers(PagedRegisterBase):
             "wclk_out": wclk_out,
         }
 
-    def _get_dac_data_path(self):
+    def _get_dac_data_path(self) -> dict:
         """The current DAC data path configuration.
 
         :return: Dictionary with DAC data path settings
@@ -412,7 +690,7 @@ class Page0Registers(PagedRegisterBase):
             "volume_step": volume_step,
         }
 
-    def _get_dac_volume_control(self):
+    def _get_dac_volume_control(self) -> dict:
         """The current DAC volume control configuration.
 
         :return: Dictionary with volume control settings
@@ -629,7 +907,7 @@ class Page0Registers(PagedRegisterBase):
             time.sleep(0.01)
 
 
-class Page1Registers(PagedRegisterBase):
+class _Page1Registers(_PagedRegisterBase):
     """Page 1 registers containing analog output settings, HP/SPK controls, etc."""
 
     def __init__(self, i2c_device):
@@ -707,26 +985,35 @@ class Page1Registers(PagedRegisterBase):
         self._write_register(_SPK_VOL, value)
 
     def _configure_hpl_pga(self, gain_db=0, unmute=True):
-        """HPL driver PGA settings."""
-        if gain_db > 9:
-            raise ValueError("Gain cannot be greater than 9")
+        """HPL driver PGA settings.
+        :raises ValueError: If set to anything outside of range 0 to 9
+        """
+        if not (0 <= gain_db <= 9):
+            raise ValueError("HPL gain must be in range 0 to 9")
         value = (gain_db & 0x0F) << 3
         if unmute:
             value |= 1 << 2
         self._write_register(_HPL_DRIVER, value)
 
     def _configure_hpr_pga(self, gain_db=0, unmute=True):
-        """HPR driver PGA settings."""
-        if gain_db > 9:
-            raise ValueError("Gain cannot be greater than 9")
+        """HPR driver PGA settings.
+        :raises ValueError: If set to anything outside of range 0 to 9
+        """
+        if not (0 <= gain_db <= 9):
+            raise ValueError("HPR gain must be in range 0 to 9")
         value = (gain_db & 0x0F) << 3
         if unmute:
             value |= 1 << 2
         self._write_register(_HPR_DRIVER, value)
 
-    def _configure_spk_pga(self, gain=SPK_GAIN_6DB, unmute=True):
-        """Speaker driver settings."""
-        value = (gain & 0x03) << 3
+    def _configure_spk_pga(self, gain_db=6, unmute=True):
+        """Speaker driver settings.
+        :raises ValueError: If set to anything other than 6, 12, 18, or 24
+        """
+        if gain_db not in set((6, 12, 18, 24)):
+            raise ValueError(f"Invalid speaker gain: {gain_db}. Must be 6, 12, 18, or 24.")
+        uint2_val = int((gain_db / 6) - 1)
+        value = (uint2_val & 0x03) << 3
         if unmute:
             value |= 1 << 2
         self._write_register(_SPK_DRIVER, value)
@@ -828,7 +1115,7 @@ class Page1Registers(PagedRegisterBase):
         self._write_register(_INPUT_CM, value)
 
 
-class Page3Registers(PagedRegisterBase):
+class _Page3Registers(_PagedRegisterBase):
     """Page 3 registers containing timer settings."""
 
     def __init__(self, i2c_device):
@@ -857,9 +1144,9 @@ class TLV320DAC3100:
         self._device: I2CDevice = I2CDevice(i2c, address)
 
         # Initialize register page classes
-        self._page0: "Page0Registers" = Page0Registers(self._device)
-        self._page1: "Page1Registers" = Page1Registers(self._device)
-        self._page3: "Page3Registers" = Page3Registers(self._device)
+        self._page0: "_Page0Registers" = _Page0Registers(self._device)
+        self._page1: "_Page1Registers" = _Page1Registers(self._device)
+        self._page3: "_Page3Registers" = _Page3Registers(self._device)
         self._sample_rate: int = 44100
         self._bit_depth: int = 16
         self._mclk_freq: int = 0  # Default blck
@@ -891,7 +1178,8 @@ class TLV320DAC3100:
     def overtemperature(self) -> bool:
         """Check if the chip is overheating.
 
-        :return: True if overtemperature condition exists, False otherwise
+        :getter: Return True if overtemperature condition exists, False
+            otherwise
         """
         return self._page0._is_overtemperature()
 
@@ -962,17 +1250,16 @@ class TLV320DAC3100:
     def left_dac(self) -> bool:
         """The left DAC enabled status.
 
-        :return: True if left DAC is enabled, False otherwise
+        True if left DAC is enabled, False otherwise
+
+        :getter: Return status
+        :setter: Set status
         """
         return self._page0._get_dac_data_path()["left_dac_on"]
 
     @left_dac.setter
     def left_dac(self, enabled: bool) -> None:
-        """The left DAC enabled status.
-
-        :param enabled: True to enable left DAC, False to disable
-        """
-        current: DACDataPath = self._page0._get_dac_data_path()
+        current: dict = self._page0._get_dac_data_path()
         self._page0._set_dac_data_path(
             enabled,
             current["right_dac_on"],
@@ -985,17 +1272,16 @@ class TLV320DAC3100:
     def right_dac(self) -> bool:
         """The right DAC enabled status.
 
-        :return: True if right DAC is enabled, False otherwise
+        True if right DAC is enabled, False otherwise.
+
+        :getter: Return status
+        :setter: Set status
         """
         return self._page0._get_dac_data_path()["right_dac_on"]
 
     @right_dac.setter
     def right_dac(self, enabled: bool) -> None:
-        """The right DAC enabled status.
-
-        :param enabled: True to enable right DAC, False to disable
-        """
-        current: DACDataPath = self._page0._get_dac_data_path()
+        current: dict = self._page0._get_dac_data_path()
         self._page0._set_dac_data_path(
             current["left_dac_on"],
             enabled,
@@ -1008,17 +1294,16 @@ class TLV320DAC3100:
     def left_dac_path(self) -> int:
         """The left DAC path setting.
 
-        :return: One of the DAC_PATH_* constants
+        One of the DAC_PATH_* constants
+
+        :getter: Return left DAC path
+        :setter: Set left DAC path
+        :raises ValueError: If set to something that's not a DAC_PATH_* constant
         """
         return self._page0._get_dac_data_path()["left_path"]
 
     @left_dac_path.setter
     def left_dac_path(self, path: int) -> None:
-        """The left DAC path.
-
-        :param path: One of the DAC_PATH_* constants
-        :raises ValueError: If path is not a valid DAC_PATH_* constant
-        """
         valid_paths: List[int] = [DAC_PATH_OFF, DAC_PATH_NORMAL, DAC_PATH_SWAPPED, DAC_PATH_MIXED]
 
         if path not in valid_paths:
@@ -1026,7 +1311,7 @@ class TLV320DAC3100:
                 f"Invalid DAC path value: {path}. Must be one of the DAC_PATH_* constants."
             )
 
-        current: DACDataPath = self._page0._get_dac_data_path()
+        current: dict = self._page0._get_dac_data_path()
         self._page0._set_dac_data_path(
             current["left_dac_on"],
             current["right_dac_on"],
@@ -1039,17 +1324,16 @@ class TLV320DAC3100:
     def right_dac_path(self) -> int:
         """The right DAC path setting.
 
-        :return: One of the DAC_PATH_* constants
+        One of the DAC_PATH_* constants
+
+        :getter: Return right DAC path
+        :setter: Set right DAC path
+        :raises ValueError: If set to something that's not a DAC_PATH_* constant
         """
         return self._page0._get_dac_data_path()["right_path"]
 
     @right_dac_path.setter
     def right_dac_path(self, path: int) -> None:
-        """The right DAC path.
-
-        :param path: One of the DAC_PATH_* constants
-        :raises ValueError: If path is not a valid DAC_PATH_* constant
-        """
         valid_paths: List[int] = [DAC_PATH_OFF, DAC_PATH_NORMAL, DAC_PATH_SWAPPED, DAC_PATH_MIXED]
 
         if path not in valid_paths:
@@ -1057,7 +1341,7 @@ class TLV320DAC3100:
                 f"Invalid DAC path value: {path}. Must be one of the DAC_PATH_* constants."
             )
 
-        current: DACDataPath = self._page0._get_dac_data_path()
+        current: dict = self._page0._get_dac_data_path()
         self._page0._set_dac_data_path(
             current["left_dac_on"],
             current["right_dac_on"],
@@ -1070,17 +1354,16 @@ class TLV320DAC3100:
     def dac_volume_step(self) -> int:
         """The DAC volume step setting.
 
-        :return: One of the VOLUME_STEP_* constants
+        One of the VOLUME_STEP_* constants.
+
+        :getter: Return current volume step
+        :setter: Set volume step
+        :raises ValueError: If step is not a valid VOLUME_STEP_* constant
         """
         return self._page0._get_dac_data_path()["volume_step"]
 
     @dac_volume_step.setter
     def dac_volume_step(self, step: int) -> None:
-        """The DAC volume step setting.
-
-        :param step: One of the VOLUME_STEP_* constants
-        :raises ValueError: If step is not a valid VOLUME_STEP_* constant
-        """
         valid_steps: List[int] = [VOLUME_STEP_1SAMPLE, VOLUME_STEP_2SAMPLE, VOLUME_STEP_DISABLED]
 
         if step not in valid_steps:
@@ -1088,7 +1371,7 @@ class TLV320DAC3100:
                 f"Invalid volume step value: {step}. Must be one of the VOLUME_STEP_* constants."
             )
 
-        current: DACDataPath = self._page0._get_dac_data_path()
+        current: dict = self._page0._get_dac_data_path()
         self._page0._set_dac_data_path(
             current["left_dac_on"],
             current["right_dac_on"],
@@ -1137,89 +1420,80 @@ class TLV320DAC3100:
     def left_dac_mute(self) -> bool:
         """The left DAC mute status.
 
-        :return: True if left DAC is muted, False otherwise
+        True if left DAC is muted, False otherwise.
+
+        :getter: Return status
+        :setter: Set status
         """
         return self._page0._get_dac_volume_control()["left_mute"]
 
     @left_dac_mute.setter
     def left_dac_mute(self, mute: bool) -> None:
-        """The left DAC mute status.
-
-        :param mute: True to mute left DAC, False to unmute
-        """
-        current: DACVolumeControl = self._page0._get_dac_volume_control()
+        current: dict = self._page0._get_dac_volume_control()
         self._page0._set_dac_volume_control(mute, current["right_mute"], current["control"])
 
     @property
     def right_dac_mute(self) -> bool:
         """The right DAC mute status.
 
-        :return: True if right DAC is muted, False otherwise
+        True if right DAC is muted, False otherwise.
+
+        :getter: Return status
+        :setter: Set status
         """
         return self._page0._get_dac_volume_control()["right_mute"]
 
     @right_dac_mute.setter
     def right_dac_mute(self, mute: bool) -> None:
-        """The right DAC mute status.
-
-        :param mute: True to mute right DAC, False to unmute
-        """
-        current: DACVolumeControl = self._page0._get_dac_volume_control()
+        current: dict = self._page0._get_dac_volume_control()
         self._page0._set_dac_volume_control(current["left_mute"], mute, current["control"])
 
     @property
     def dac_volume_control_mode(self) -> int:
         """The DAC volume control mode.
 
-        :return: One of the VOL_* constants
+        One of the VOL_* constants.
+
+        :getter: Return mode
+        :setter: Set mode
+        :raises ValueError: If mode is not a valid VOL_* constant
         """
         return self._page0._get_dac_volume_control()["control"]
 
     @dac_volume_control_mode.setter
     def dac_volume_control_mode(self, mode: int) -> None:
-        """The volume control mode.
-
-        :param mode: One of the VOL_* constants for volume control mode
-        :raises ValueError: If mode is not a valid VOL_* constant
-        """
         valid_modes: List[int] = [VOL_INDEPENDENT, VOL_LEFT_TO_RIGHT, VOL_RIGHT_TO_LEFT]
         if mode not in valid_modes:
             raise ValueError(
                 f"Invalid volume control mode: {mode}. Must be one of the VOL_* constants."
             )
-        current: DACVolumeControl = self._page0._get_dac_volume_control()
+        current: dict = self._page0._get_dac_volume_control()
         self._page0._set_dac_volume_control(current["left_mute"], current["right_mute"], mode)
 
     @property
     def left_dac_channel_volume(self) -> float:
         """Left DAC channel volume in dB.
 
-        :return: Volume in dB
+        :getter: Return volume
+        :setter: Set volume
         """
         return self._page0._get_channel_volume(False)
 
     @left_dac_channel_volume.setter
     def left_dac_channel_volume(self, db: float) -> None:
-        """Left DAC channel volume in dB.
-
-        :param db: Volume in dB
-        """
         self._page0._set_channel_volume(False, db)
 
     @property
     def right_dac_channel_volume(self) -> float:
         """Right DAC channel volume in dB.
 
-        :return: Volume in dB
+        :getter: Return volume
+        :setter: Set volume
         """
         return self._page0._get_channel_volume(True)
 
     @right_dac_channel_volume.setter
     def right_dac_channel_volume(self, db: float) -> None:
-        """Right DAC channel volume in dB.
-
-        :param db: Volume in dB
-        """
         self._page0._set_channel_volume(True, db)
 
     @staticmethod
@@ -1256,10 +1530,25 @@ class TLV320DAC3100:
 
     @property
     def dac_volume(self) -> float:
-        """
-        Get the current DAC digital volume in dB.
+        """Current DAC digital volume in dB.
 
-        :return: Volume in dB (-63.5 to 24 dB)
+        Range is -63.5 dB (soft) to 24 dB (loud).
+
+        This acts on two registers at once. In the datasheet, they are:
+
+        * Page 0 / Register 65 (0x41): DAC Left Volume Control
+
+        * Page 0 / Register 66 (0x42): DAC Right Volume Control
+
+        Changing the DAC volume will change the signal level feeding into the
+        analog signal chains of the speaker and both headphone channels. You
+        should also be aware of ``speaker_volume``, ``speaker_gain``,
+        ``speaker_mute``, ``headphone_volume``, ``headphone_left_gain``,
+        ``headphone_right_gain``, ``headphone_left_mute``, and
+        ``headphone_right_mute``.
+
+        :getter: Return volume
+        :setter: Set volume
         """
         left_vol = self._page0._read_register(_DAC_LVOL)
         right_vol = self._page0._read_register(_DAC_RVOL)
@@ -1271,11 +1560,6 @@ class TLV320DAC3100:
 
     @dac_volume.setter
     def dac_volume(self, db: float) -> None:
-        """
-        Set the DAC digital volume in dB.
-
-        :param db: Volume in dB (-63.5 to 24 dB)
-        """
         db = max(-63.5, min(24, db))
         reg_val = self._convert_db_to_reg(db)
         self._page0._set_page()
@@ -1337,117 +1621,129 @@ class TLV320DAC3100:
 
     @property
     def headphone_left_gain(self) -> int:
-        """The left headphone gain in dB.
+        """Left headphone amplifier gain in dB.
 
-        :return: Gain value in dB
+        Range is 0 dB (soft) to 9 dB (loud) in steps of 1 dB.
+
+        In the datasheet, this is Page 1 / Register 40 (0x28): HPL Driver.
+
+        Note that the headphone left channel volume is also affected by
+        ``dac_volume``, ``headphone_volume``, and ``headphone_left_mute``.
+
+        :getter: Return gain
+        :setter: Set gain
+        :raises ValueError: If set to a value outside the range of 0 to 9
         """
         reg_value = self._page1._read_register(_HPL_DRIVER)
         return (reg_value >> 3) & 0x0F
 
     @headphone_left_gain.setter
     def headphone_left_gain(self, gain_db: int) -> None:
-        """The left headphone gain in dB.
-
-        :param gain_db: Gain value in dB
-        """
         unmute = not self.headphone_left_mute
-        self._page1._configure_hpl_pga(gain_db, unmute)
+        # This call can raise ValueError
+        self._page1._configure_hpl_pga(int(gain_db), unmute)
 
     @property
     def headphone_left_mute(self) -> bool:
-        """The left headphone mute status.
+        """Left headphone mute status.
 
-        :return: True if left headphone is muted, False otherwise
+        True means left headphone is muted, False means not muted.
+
+        :getter: Return status
+        :setter: Set status
         """
         reg_value = self._page1._read_register(_HPL_DRIVER)
         return not bool(reg_value & (1 << 2))
 
     @headphone_left_mute.setter
     def headphone_left_mute(self, mute: bool) -> None:
-        """The left headphone mute status.
-
-        :param mute: True to mute left headphone, False to unmute
-        """
         gain = self.headphone_left_gain
+        # This could in theory raise ValueError, but that's very unlikely
         self._page1._configure_hpl_pga(gain, not mute)
 
     @property
     def headphone_right_gain(self) -> int:
-        """The right headphone gain in dB.
+        """Right headphone amplifier gain in dB.
 
-        :return: Gain value in dB
+        Range is 0 dB (soft) to 9 dB (loud) in steps of 1 dB.
+
+        In the datasheet, this is Page 1 / Register 41 (0x29): HPR Driver.
+
+        Note that the headphone right channel volume is also affected by
+        ``dac_volume``, ``headphone_volume``, and ``headphone_right_mute``.
+
+        :getter: Return gain
+        :setter: Set gain
+        :raises ValueError: If set to a value outside the range of 0 to 9
         """
         reg_value = self._page1._read_register(_HPR_DRIVER)
         return (reg_value >> 3) & 0x0F
 
     @headphone_right_gain.setter
     def headphone_right_gain(self, gain_db: int) -> None:
-        """The right headphone gain in dB.
-
-        :param gain_db: Gain value in dB
-        """
         unmute = not self.headphone_right_mute
-        self._page1._configure_hpr_pga(gain_db, unmute)
+        # This call can raise ValueError
+        self._page1._configure_hpr_pga(int(gain_db), unmute)
 
     @property
     def headphone_right_mute(self) -> bool:
-        """The right headphone mute status.
+        """Right headphone mute status.
 
-        :return: True if right headphone is muted, False otherwise
+        True means right headphone is muted, False means not muted.
+
+        :getter: Return status
+        :setter: Set status
         """
         reg_value = self._page1._read_register(_HPR_DRIVER)
         return not bool(reg_value & (1 << 2))
 
     @headphone_right_mute.setter
     def headphone_right_mute(self, mute: bool) -> None:
-        """The right headphone mute status.
-
-        :param mute: True to mute right headphone, False to unmute
-        """
         gain = self.headphone_right_gain
         self._page1._configure_hpr_pga(gain, not mute)
 
     @property
     def speaker_gain(self) -> int:
-        """The speaker gain setting in dB.
+        """Speaker amplifier gain setting in dB.
 
-        :return: The gain value in dB
+        Range is 6 dB (soft) to 24 dB (loud) in steps of 6 dB.
+
+        In the datasheet, this is Page 1 / Register 42 (0x2A): Class-D Speaker
+        (SPK) Driver.
+
+        Note that ``dac_volume``, ``speaker_volume``, and ``speaker_mute``
+        also affect the speaker output level.
+
+        :getter: Return gain
+        :setter: Set gain
+        :raises ValueError: If set to anything other than 6, 12, 18, or 24
         """
+        # This gives us a 2-bit unsigned integer where 0 means 6 dB, 1 is 12 dB,
+        # 2 is 18 dB, and 3 is 24 dB
         reg_value = self._page1._read_register(_SPK_DRIVER)
-        return (reg_value >> 3) & 0x03
+        return (((reg_value >> 3) & 0x03) + 1) * 6
 
     @speaker_gain.setter
     def speaker_gain(self, gain_db: int) -> None:
-        """The speaker gain in dB.
-
-        :param gain_db: Speaker gain in dB (6, 12, 18, or 24)
-        :raises ValueError: If gain_db is not a valid value
-        """
-        # Convert dB to register value
-        gain_mapping: List[int] = [SPK_GAIN_6DB, SPK_GAIN_12DB, SPK_GAIN_18DB, SPK_GAIN_24DB]
-
-        if gain_db not in gain_mapping:
-            raise ValueError(
-                f"Invalid preset value: {gain_db}. Must be one of the SPK_GAIN_* constants."
-            )
         unmute = not self.speaker_mute
+        # This relies on _configure_spk_pga() to raise ValueError if the gain
+        # value is out of range
         self._page1._configure_spk_pga(gain_db, unmute)
 
     @property
     def speaker_mute(self) -> bool:
         """The speaker mute status.
 
-        :return: True if speaker is muted, False otherwise
+        True means speaker is muted, False means unmuted.
+
+        :getter: Return status
+        :setter: Set status
         """
         reg_value = self._page1._read_register(_SPK_DRIVER)
         return not bool(reg_value & (1 << 2))
 
     @speaker_mute.setter
     def speaker_mute(self, mute: bool) -> None:
-        """The speaker mute status.
-
-        :param mute: True to mute speaker, False to unmute
-        """
         gain = self.speaker_gain
         # Unmute is inverse of mute
         self._page1._configure_spk_pga(gain, not mute)
@@ -1456,7 +1752,7 @@ class TLV320DAC3100:
     def dac_flags(self) -> Dict[str, Any]:
         """The DAC and output driver status flags.
 
-        :return: Dictionary with status flags
+        :getter: Return dictionary with status flags
         """
         return self._page0._get_dac_flags()
 
@@ -1464,18 +1760,17 @@ class TLV320DAC3100:
     def gpio1_mode(self) -> int:
         """The current GPIO1 pin mode.
 
-        :return: One of the GPIO1_* mode constants
+        One of the GPIO1_* mode constants.
+
+        :getter: Return mode
+        :setter: Set mode
+        :raises ValueError: If mode is not a valid GPIO1_* constant
         """
         value = self._page0._read_register(_GPIO1_CTRL)
         return (value >> 2) & 0x0F
 
     @gpio1_mode.setter
     def gpio1_mode(self, mode: int) -> None:
-        """The GPIO1 pin mode.
-
-        :param mode: One of the GPIO1_* mode constants
-        :raises ValueError: If mode is not a valid GPIO1_* constant
-        """
         valid_modes: List[int] = [
             GPIO1_DISABLED,
             GPIO1_INPUT_MODE,
@@ -1497,7 +1792,7 @@ class TLV320DAC3100:
     def din_input(self) -> int:
         """The current DIN input value.
 
-        :return: The DIN input value
+        :getter: Return the DIN input value
         """
         return self._page0._get_din_input()
 
@@ -1505,7 +1800,7 @@ class TLV320DAC3100:
     def codec_interface(self) -> Dict[str, Any]:
         """The current codec interface settings.
 
-        :return: Dictionary with codec interface settings
+        :getter: Return dictionary with codec interface settings
         """
         return self._page0._get_codec_interface()
 
@@ -1513,7 +1808,7 @@ class TLV320DAC3100:
     def headphone_shorted(self) -> bool:
         """Check if headphone short circuit is detected.
 
-        :return: True if headphone is shorted, False otherwise
+        :getter: Return True if headphone is shorted, False otherwise
         """
         return self._page1._is_headphone_shorted()
 
@@ -1521,7 +1816,7 @@ class TLV320DAC3100:
     def speaker_shorted(self) -> bool:
         """Check if speaker short circuit is detected.
 
-        :return: True if speaker is shorted, False otherwise
+        :getter: Return True if speaker is shorted, False otherwise
         """
         return self._page1._is_speaker_shorted()
 
@@ -1529,7 +1824,7 @@ class TLV320DAC3100:
     def hpl_gain_applied(self) -> bool:
         """Check if all programmed gains have been applied to HPL.
 
-        :return: True if gains are applied, False otherwise
+        :getter: Return True if gains are applied, False otherwise
         """
         return self._page1._is_hpl_gain_applied()
 
@@ -1537,7 +1832,7 @@ class TLV320DAC3100:
     def hpr_gain_applied(self) -> bool:
         """Check if all programmed gains have been applied to HPR.
 
-        :return: True if gains are applied, False otherwise
+        :getter: Return True if gains are applied, False otherwise
         """
         return self._page1._is_hpr_gain_applied()
 
@@ -1545,7 +1840,7 @@ class TLV320DAC3100:
     def speaker_gain_applied(self) -> bool:
         """Check if all programmed gains have been applied to Speaker.
 
-        :return: True if gains are applied, False otherwise
+        :getter: Return True if gains are applied, False otherwise
         """
         return self._page1._is_spk_gain_applied()
 
@@ -1553,40 +1848,41 @@ class TLV320DAC3100:
     def headset_status(self) -> int:
         """Current headset detection status.
 
-        :return: Integer value representing headset status (0=none, 1=without mic, 3=with mic)
+        :getter: Return Integer value representing headset status (0=none,
+            1=without mic, 3=with mic)
         """
         return self._page0._get_headset_status()
 
     @property
     def reset_speaker_on_scd(self) -> bool:
-        """The speaker reset behavior on short circuit detection.
+        """The speaker reset mode for short circuit detection.
 
-        :return: True if speaker resets on short circuit, False otherwise
+        True if speaker resets on short circuit, False otherwise.
+
+        :getter: Return mode
+        :setter: Set mode
         """
         value = self._page1._read_register(_HP_SPK_ERR_CTL)
         return not bool((value >> 1) & 0x01)
 
     @reset_speaker_on_scd.setter
     def reset_speaker_on_scd(self, reset: bool) -> None:
-        """
-        :param reset: True to reset speaker on short circuit, False to remain unchanged
-        """
         self._page1._reset_speaker_on_scd(reset)
 
     @property
     def reset_headphone_on_scd(self) -> bool:
-        """The headphone reset behavior on short circuit detection.
+        """The headphone reset mode for short circuit detection.
 
-        :return: True if headphone resets on short circuit, False otherwise
+        True if headphone resets on short circuit, False otherwise.
+
+        :getter: Return mode
+        :setter: Set mode
         """
         value = self._page1._read_register(_HP_SPK_ERR_CTL)
         return not bool(value & 0x01)
 
     @reset_headphone_on_scd.setter
     def reset_headphone_on_scd(self, reset: bool) -> None:
-        """
-        :param reset: True to reset headphone on short circuit, False to remain unchanged
-        """
         self._page1._reset_headphone_on_scd(reset)
 
     def configure_headphone_pop(
@@ -1605,24 +1901,25 @@ class TLV320DAC3100:
     def speaker_wait_time(self) -> int:
         """The current speaker power-up wait time.
 
-        :return: The wait time setting (0-7)
+        Speaker power-up wait duration (0-7).
+
+        :getter: Return wait time
+        :setter: Set wait time
         """
         value = self._page1._read_register(_PGA_RAMP)
         return (value >> 4) & 0x07
 
     @speaker_wait_time.setter
     def speaker_wait_time(self, wait_time: int) -> None:
-        """Speaker power-up wait time.
-
-        :param wait_time: Speaker power-up wait duration (0-7)
-        """
         self._page1._set_speaker_wait_time(wait_time)
 
     @property
     def headphone_lineout(self) -> bool:
         """The current headphone line-out configuration.
 
-        :return: True if both channels are configured as line-out, False otherwise
+        :getter: Return True if both channels are configured as line-out, False
+            otherwise
+        :setter: True to configure both channels as line-out, False otherwise
         """
         value = self._page1._read_register(_HP_DRIVER_CTRL)
         left = bool(value & (1 << 2))
@@ -1631,9 +1928,6 @@ class TLV320DAC3100:
 
     @headphone_lineout.setter
     def headphone_lineout(self, enabled: bool) -> None:
-        """
-        :param enabled: True to configure both channels as line-out, False otherwise
-        """
         self._page1._headphone_lineout(enabled, enabled)
 
     def config_mic_bias(
@@ -1670,16 +1964,20 @@ class TLV320DAC3100:
     def vol_adc_pin_control(self) -> bool:
         """The volume ADC pin control status.
 
-        :return: True if volume ADC pin control is enabled, False otherwise
+        True if volume ADC pin control is enabled, False otherwise.
+
+        This is for using an analog input pin, probably connected to a
+        potentiometer, to control the volume. You can ignore this if you want
+        to control volume from software over I2C.
+
+        :getter: Return status
+        :setter: Set status
         """
         reg_value = self._page0._read_register(_VOL_ADC_CTRL)
         return bool(reg_value & (1 << 7))
 
     @vol_adc_pin_control.setter
     def vol_adc_pin_control(self, enabled: bool) -> None:
-        """
-        :param enabled: True to enable volume ADC pin control, False to disable
-        """
         current_config = self._get_vol_adc_config()
         self._page0._config_vol_adc(
             enabled,
@@ -1692,16 +1990,16 @@ class TLV320DAC3100:
     def vol_adc_use_mclk(self) -> bool:
         """The volume ADC use MCLK status.
 
-        :return: True if volume ADC uses MCLK, False otherwise
+        True means volume ADC uses MCLK, False means internal oscillator.
+
+        :getter: Return status
+        :setter: Set status
         """
         reg_value = self._page0._read_register(_VOL_ADC_CTRL)
         return bool(reg_value & (1 << 6))
 
     @vol_adc_use_mclk.setter
     def vol_adc_use_mclk(self, use_mclk: bool) -> None:
-        """
-        :param use_mclk: True to use MCLK, False to use internal oscillator
-        """
         current_config = self._get_vol_adc_config()
         self._page0._config_vol_adc(
             current_config["pin_control"],
@@ -1714,16 +2012,16 @@ class TLV320DAC3100:
     def vol_adc_hysteresis(self) -> int:
         """The volume ADC hysteresis setting.
 
-        :return: Hysteresis value (0-3)
+        Hysteresis value (0-3).
+
+        :getter: Return value
+        :setter: Set value
         """
         reg_value = self._page0._read_register(_VOL_ADC_CTRL)
         return (reg_value >> 4) & 0x03
 
     @vol_adc_hysteresis.setter
     def vol_adc_hysteresis(self, hysteresis: int) -> None:
-        """
-        :param hysteresis: Hysteresis value (0-3)
-        """
         current_config = self._get_vol_adc_config()
         self._page0._config_vol_adc(
             current_config["pin_control"],
@@ -1736,17 +2034,16 @@ class TLV320DAC3100:
     def vol_adc_rate(self) -> int:
         """The volume ADC sampling rate.
 
-        :return: Rate value (0-7)
+        Rate value (0-7).
+
+        :getter: Return value
+        :setter: Set value
         """
         reg_value = self._page0._read_register(_VOL_ADC_CTRL)
         return reg_value & 0x07
 
     @vol_adc_rate.setter
     def vol_adc_rate(self, rate: int) -> None:
-        """
-
-        :param rate: Rate value (0-7)
-        """
         current_config = self._get_vol_adc_config()
         self._page0._config_vol_adc(
             current_config["pin_control"],
@@ -1772,7 +2069,7 @@ class TLV320DAC3100:
     def vol_adc_db(self) -> float:
         """The current volume from the Volume ADC in dB.
 
-        :return: Volume in dB
+        :getter: Return Volume in dB
         """
         return self._page0._read_vol_adc_db()
 
@@ -1826,10 +2123,24 @@ class TLV320DAC3100:
 
     @property
     def headphone_output(self) -> bool:
-        """Headphone output helper with quickstart settings for users.
-        Headphone output state (True if either left or right channel is powered).
+        """Headphone output helper with quickstart default settings.
 
-        :return: True if headphone output is enabled, False otherwise
+        If you set this property to True, the setter will set defaults that
+        are intended for listening at a quiet-ish level with sensitive low
+        impedance earbuds:
+
+        * dac_volume = -20
+        * headphone_volume = -51.8
+        * headphone_left_gain = headphone_right_gain = 0
+
+        If you set this to False, the setter turns off the headphone amp.
+
+        :getter: Return headphone output state: True if either left or right
+            headphone amplifier is powered, False otherwise.
+        :setter: **This sets several properties to prepare for headphone use**.
+            Changed properties include DAC channel enable/volume/mute, DAC
+            path, headphone gain, headphone common mode voltage, and headphone
+            mute.
         """
         hp_drivers = self._page1._read_register(_HP_DRIVERS)
         left_powered = bool(hp_drivers & (1 << 7))
@@ -1838,14 +2149,11 @@ class TLV320DAC3100:
 
     @headphone_output.setter
     def headphone_output(self, enabled: bool) -> None:
-        """
-        :param enabled: True to enable headphone output, False to disable
-        """
         if enabled:
             self.left_dac = True
             self.right_dac = True
-            self.left_dac_channel_volume = 0
-            self.right_dac_channel_volume = 0
+            self.left_dac_channel_volume = -20
+            self.right_dac_channel_volume = -20
             self.left_dac_mute = False
             self.right_dac_mute = False
             self.left_dac_path = DAC_PATH_NORMAL
@@ -1855,7 +2163,18 @@ class TLV320DAC3100:
             self._page1._configure_headphone_driver(
                 left_powered=True, right_powered=True, common=HP_COMMON_1_65V
             )
-            self._page1._configure_analog_inputs(left_dac=DAC_ROUTE_HP, right_dac=DAC_ROUTE_HP)
+            self.headphone_volume = -52.8
+            # NOTE: If you use DAC_ROUTE_HP here instead of DAC_ROUTE_MIXER,
+            # the DAC output will bypass the headphone analog volume
+            # attenuation stage and go straight into the headphone amp. That
+            # might possibly be useful to save power, but it reduces your gain
+            # adjustment options. For low impedance headphones, it's helpful to
+            # have a lot of attenuation between the DAC and the headphone amp.
+            # Otherwise, you may have to operate the DAC volume setting down
+            # near the bottom of its usable range.
+            self._page1._configure_analog_inputs(
+                left_dac=DAC_ROUTE_MIXER, right_dac=DAC_ROUTE_MIXER
+            )
             self.headphone_left_mute = False
             self.headphone_right_mute = False
         else:
@@ -1863,99 +2182,110 @@ class TLV320DAC3100:
 
     @property
     def speaker_output(self) -> bool:
-        """Speaker output helper with quickstart settings for users.
-        Speaker output state.
+        """Speaker output helper with quickstart default settings.
 
-        :return: True if speaker output is enabled, False otherwise
+        If you set this property to True, the setter will set defaults intended
+        for a relatively quiet listening level using the 8Ω 1W mini speaker
+        that comes bundled with the Fruit Jam:
+
+        * dac_volume = -20
+        * speaker_volume = -20.1
+        * speaker_gain = 6
+
+        If you set this to False, the setter turns off the speaker amp.
+
+        :getter: Return speaker output state: True if speaker amplifier is
+            powered, False otherwise.
+        :setter: **This sets several properties to prepare for speaker use**.
+            Changed properties include DAC channel enable/volume/mute, DAC
+            path, speaker volume, speaker amplifier gain, and speaker mute.
         """
         return self._page1._get_speaker_enabled()
 
     @speaker_output.setter
     def speaker_output(self, enabled: bool) -> None:
-        """
-        :param enabled: True to enable speaker, False to disable
-        """
         if enabled:
             self.left_dac = True
             self.right_dac = True
-            self.left_dac_channel_volume = 0
-            self.right_dac_channel_volume = 0
+            self.left_dac_channel_volume = -20
+            self.right_dac_channel_volume = -20
             self.left_dac_mute = False
             self.right_dac_mute = False
             self.left_dac_path = DAC_PATH_NORMAL
             self.right_dac_path = DAC_PATH_NORMAL
-            self.speaker_gain = SPK_GAIN_18DB
+            self.speaker_gain = 6  # safest speaker amp gain option: 6 dB
             self._page1._set_speaker_enabled(True)
             self._page1._configure_analog_inputs(
                 left_dac=DAC_ROUTE_MIXER, right_dac=DAC_ROUTE_MIXER
             )
-            self.speaker_volume = -20
+            self.speaker_volume = -20.1
             self.speaker_mute = False
         else:
             self._page1._set_speaker_enabled(False)
 
     @property
     def headphone_volume(self) -> float:
-        """The current headphone volume in dB.
-        :return: The volume in dB (0 = max, -78.3 = min)
-        """
-        left_gain = self._page1._read_register(_HPL_VOL) & 0x7F
-        right_gain = self._page1._read_register(_HPR_VOL) & 0x7F
+        """Current headphone analog volume in dB.
 
-        if left_gain == right_gain:
-            db = -left_gain / 2.0
-            db = max(-78.3, min(0, db))
-            return db
+        Range is 0 (loud) to -78.3 (very soft).
+
+        This acts on two registers at once. In the datasheet they are:
+
+        * Page 1 / Register 36 (0x24): Left Analog Volume to HPL
+        * Page 1 / Register 37 (0x25) Right Analog Volume to HPR
+
+        Note that headphone output is also affected by ``dac_volume``,
+        ``headphone_left_gain``, ``headphone_right_gain``,
+        ``headphone_left_mute``, and ``headphone_right_mute``.
+
+        :getter: Return volume
+        :setter: Set volume
+        """
+        left_gain_u7 = self._page1._read_register(_HPL_VOL) & 0x7F
+        right_gain_u7 = self._page1._read_register(_HPR_VOL) & 0x7F
+        left_db = _table_6_24_uint7_to_db(left_gain_u7)
+        right_db = _table_6_24_uint7_to_db(right_gain_u7)
+        if left_db == right_db:
+            return left_db
         else:
-            avg_gain = (left_gain + right_gain) / 2
-            db = -avg_gain / 2.0
-            db = max(-78.3, min(0, db))
-            return db
+            return (left_db + right_db) / 2
 
     @headphone_volume.setter
     def headphone_volume(self, db: float) -> None:
-        """
-        Set headphone volume in dB (0 to -78.3 dB)
-        :param db: Volume in dB (0 = max, -78.3 = min)
-        """
-        if db > 0:
-            db = 0
-        elif db < -78.3:
-            db = -78.3
-        gain = int(-2 * db)
-        gain = max(0, min(gain, 127))
-        self._page1._set_hpl_volume(route_enabled=True, gain=gain)
-        self._page1._set_hpr_volume(route_enabled=True, gain=gain)
+        # The table 6-24 lookup function includes min/max range clipping
+        gain_u7 = _table_6_24_db_to_uint7(db)
+        self._page1._set_hpl_volume(route_enabled=True, gain=gain_u7)
+        self._page1._set_hpr_volume(route_enabled=True, gain=gain_u7)
 
     @property
     def speaker_volume(self) -> float:
-        """The current speaker volume in dB.
+        """Current speaker analog volume in dB.
 
-        :return: The volume in dB (0 = max, -63.5 = min)
+        Range is 0 (loud) to -78.3 (very soft).
+
+        In the datasheet, this is Page 1 / Register 38 (0x26): Left Analog
+        Volume to SPK.
+
+        Note that ``dac_volume``, ``speaker_gain``, and ``speaker_mute`` also
+        affect the speaker output level.
+
+        :getter: Return volume
+        :setter: Set volume
         """
-        gain = self._page1._read_register(_SPK_VOL) & 0x7F
-        # Convert from register value to dB
-        # 55 ≈ 0dB, 0 ≈ -63.5dB
-        db = (gain - 55) / 1.14
-        return db
+        gain_u7 = self._page1._read_register(_SPK_VOL) & 0x7F
+        return _table_6_24_uint7_to_db(gain_u7)
 
     @speaker_volume.setter
     def speaker_volume(self, db: float) -> None:
-        """
-
-        :param db: Volume in dB (0 = max, -63.5 = min)
-        """
-        if db > 0:
-            db = 0
-        gain = int(55 + (db * 1.14))
-        gain = max(0, min(gain, 127))
-        self._page1._set_spk_volume(route_enabled=True, gain=gain)
+        # The table 6-24 lookup function includes min/max range clipping
+        gain_u7 = _table_6_24_db_to_uint7(db)
+        self._page1._set_spk_volume(route_enabled=True, gain=gain_u7)
 
     @property
     def sample_rate(self) -> int:
         """Configured sample rate in Hz.
 
-        :return: The sample rate in Hz
+        :getter: Return The sample rate in Hz
         """
         return self._sample_rate
 
@@ -1963,7 +2293,7 @@ class TLV320DAC3100:
     def bit_depth(self) -> int:
         """Configured bit depth.
 
-        :return: The bit depth
+        :getter: Return The bit depth
         """
         return self._bit_depth
 
@@ -1971,6 +2301,6 @@ class TLV320DAC3100:
     def mclk_freq(self) -> int:
         """Configured MCLK frequency in Hz.
 
-        :return: The MCLK frequency in Hz
+        :getter: Return The MCLK frequency in Hz
         """
         return self._mclk_freq
