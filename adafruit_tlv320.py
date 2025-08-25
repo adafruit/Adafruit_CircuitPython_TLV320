@@ -8,7 +8,7 @@
 CircuitPython driver for the TLV320DAC3100 I2S DAC
 
 
-* Author(s): Liz Clark
+* Author(s): Liz Clark, Sam Blenny
 
 Implementation Notes
 --------------------
@@ -24,20 +24,19 @@ Implementation Notes
   left, and headphone right start with the DAC, then they go through a mixer
   stage, an analog volume (attenuation) stage, and finally an analog amplifier
   stage. Parameters for each stage of each signal chain can be separately set
-  with different properties.
+  with different properties. But, you can ignore most of that if you use
+  ``speaker_output = True`` or ``headphone_output = True`` to load defaults.
 
 * To understand how the different audio stages (DAC, volume, amplifier gain)
   relate to each other, it can help to look at the Functional Block Diagram in
   the TLV320DAC3100 datasheet:
   https://learn.adafruit.com/adafruit-tlv320dac3100-i2s-dac/downloads
 
-* **CAUTION**: The TLV320 speaker amplifier has enough power to easily burn out
-  small 1W speakers if you max out the volume and gain settings. To be safe,
-  start with lower levels for ``speaker_volume`` and ``speaker_gain``, then work
-  your way up to find a comfortable listening level. Similarly, for the
-  headphone output, start low with ``headphone_volume``,
-  ``headphone_left_gain``, and ``headphone_right_gain``, then increase as
-  needed.
+* **CAUTION**: The TLV320 amplifiers have enough power to easily burn out
+  small 1W speakers or drive headphones to levels that could damage your
+  hearing. To be safe, start with low volume and gain levels, then increase
+  them carefully to find a comfortable listening level. This is why the
+  default levels set by speaker_output and headphone_output are relatively low.
 
 **Software and Dependencies:**
 
@@ -45,6 +44,68 @@ Implementation Notes
   https://circuitpython.org/downloads
 
 * Adafruit's Bus Device library: https://github.com/adafruit/Adafruit_CircuitPython_BusDevice
+
+Usage Examples
+--------------
+
+Fruit Jam Mini-Speaker
+^^^^^^^^^^^^^^^^^^^^^^
+
+This will start you off with a relatively low volume for the Fruit Jam's
+bundled 8-Ohm 1 Watt speaker. Your code can adjust the volume by increasing
+or decreasing ``dac_volume``. To use a higher wattage speaker that needs
+more power, you might want to increase ``speaker_volume``.
+
+::
+
+    dac = TLV320DAC3100(board.I2C())
+    dac.speaker_output = True            # set defaults for speaker
+    dac.dac_volume = dac.dac_volume + 1  # increase volume by 1 dB
+    dac.dac_volume = dac.dac_volume - 1  # decrease volume by 1 dB
+
+Low Impedance Earbuds
+^^^^^^^^^^^^^^^^^^^^^
+
+This will start you off with a relatively low volume for low impedance
+earbuds (e.g. JVC Gumy) plugged into the Fruit Jam's headphone jack. Your
+code can adjust the volume by increasing or decreasing ``dac_volume``. To
+use high impedance headphones that need more power, you might want to
+increase ``headphone_volume``.
+
+::
+
+    dac = TLV320DAC3100(board.I2C())
+    dac.speaker_output = False           # make sure speaker amp is off
+    dac.headphone_output = True          # set defaults for headphones
+    dac.dac_volume = dac.dac_volume + 1  # increase volume by 1 dB
+    dac.dac_volume = dac.dac_volume - 1  # decrease volume by 1 dB
+
+Line Level Output to Mixer
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+For this one, the default headphone output volume will be way too low for
+use with a device that expects consumer line level input (-10 dBV). To fix
+that, you can increase ``dac_volume`` or ``headphone_volume``. If you want
+to experiment with different ways of setting the levels, check out the
+volume test example: `Volume test <../examples.html#volume-test>`_
+
+::
+
+    dac = TLV320DAC3100(board.I2C())
+    dac.speaker_output = False    # make sure speaker amp is off
+    dac.headphone_output = True   # set defaults for headphones (note: too low!)
+
+    # Make it louder by increasing headphone_volume. We could also use
+    # dac_volume, but doing it this way gives a better balance between
+    # the speaker signal chain and the headphone jack signal chain. (think
+    # of headphone_volume as a mixer channel's pad switch or gain trim knob
+    # and dac_volume as the main volume control fader)
+    #
+    # CAUTION: This will be *way* too loud for earbuds, please be careful!
+    dac.headphone_volume = -15.5  # default is -51.8 dB
+
+API
+---
 """
 
 import time
