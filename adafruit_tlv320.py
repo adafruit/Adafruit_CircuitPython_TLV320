@@ -102,7 +102,7 @@ volume test example: `Volume test <./examples.html#volume-test>`_
     # and dac_volume as the main volume control fader)
     #
     # CAUTION: This will be *way* too loud for earbuds, please be careful!
-    dac.headphone_volume = -15.5  # default is -51.8 dB
+    dac.headphone_volume = -15.5  # default is -30.1 dB
 
 API
 ---
@@ -2130,7 +2130,7 @@ class TLV320DAC3100:
         impedance earbuds:
 
         * dac_volume = -20
-        * headphone_volume = -51.8
+        * headphone_volume = -30.1
         * headphone_left_gain = headphone_right_gain = 0
 
         If you set this to False, the setter turns off the headphone amp.
@@ -2163,7 +2163,7 @@ class TLV320DAC3100:
             self._page1._configure_headphone_driver(
                 left_powered=True, right_powered=True, common=HP_COMMON_1_65V
             )
-            self.headphone_volume = -52.8
+            self.headphone_volume = -30.1
             # NOTE: If you use DAC_ROUTE_HP here instead of DAC_ROUTE_MIXER,
             # the DAC output will bypass the headphone analog volume
             # attenuation stage and go straight into the headphone amp. That
