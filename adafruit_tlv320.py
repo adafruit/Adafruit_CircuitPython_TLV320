@@ -2158,12 +2158,12 @@ class TLV320DAC3100:
             self.right_dac_mute = False
             self.left_dac_path = DAC_PATH_NORMAL
             self.right_dac_path = DAC_PATH_NORMAL
-            self.headphone_left_gain = 0
-            self.headphone_right_gain = 0
+            self.headphone_left_gain = 6
+            self.headphone_right_gain = 6
             self._page1._configure_headphone_driver(
                 left_powered=True, right_powered=True, common=HP_COMMON_1_65V
             )
-            self.headphone_volume = -30.1
+            self.headphone_volume = -20.1
             # NOTE: If you use DAC_ROUTE_HP here instead of DAC_ROUTE_MIXER,
             # the DAC output will bypass the headphone analog volume
             # attenuation stage and go straight into the headphone amp. That
@@ -2213,12 +2213,12 @@ class TLV320DAC3100:
             self.right_dac_mute = False
             self.left_dac_path = DAC_PATH_NORMAL
             self.right_dac_path = DAC_PATH_NORMAL
-            self.speaker_gain = 6  # safest speaker amp gain option: 6 dB
+            self.speaker_gain = 12
             self._page1._set_speaker_enabled(True)
             self._page1._configure_analog_inputs(
                 left_dac=DAC_ROUTE_MIXER, right_dac=DAC_ROUTE_MIXER
             )
-            self.speaker_volume = -20.1
+            self.speaker_volume = -10
             self.speaker_mute = False
         else:
             self._page1._set_speaker_enabled(False)
