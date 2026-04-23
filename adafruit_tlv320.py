@@ -632,10 +632,8 @@ class _Page0Registers(_PagedRegisterBase):
 
     def _set_channel_volume(self, right_channel, db):
         """DAC channel volume in dB."""
-        if db > 24.0:
-            db = 24.0
-        if db < -63.5:
-            db = -63.5
+        db = min(db, 24.0)
+        db = max(db, -63.5)
         reg_val = int(db * 2)
         if reg_val == 0x80 or reg_val > 0x30:
             raise ValueError
@@ -1012,22 +1010,19 @@ class _Page1Registers(_PagedRegisterBase):
 
     def _set_hpl_volume(self, route_enabled, gain=0x7F):
         """HPL analog volume control."""
-        if gain > 0x7F:
-            gain = 0x7F
+        gain = min(gain, 0x7F)
         value = ((1 if route_enabled else 0) << 7) | (gain & 0x7F)
         self._write_register(_HPL_VOL, value)
 
     def _set_hpr_volume(self, route_enabled, gain=0x7F):
         """HPR analog volume control."""
-        if gain > 0x7F:
-            gain = 0x7F
+        gain = min(gain, 0x7F)
         value = ((1 if route_enabled else 0) << 7) | (gain & 0x7F)
         self._write_register(_HPR_VOL, value)
 
     def _set_spk_volume(self, route_enabled, gain=0x7F):
         """Speaker analog volume control."""
-        if gain > 0x7F:
-            gain = 0x7F
+        gain = min(gain, 0x7F)
         value = ((1 if route_enabled else 0) << 7) | (gain & 0x7F)
         self._write_register(_SPK_VOL, value)
 
@@ -1191,9 +1186,9 @@ class TLV320DAC3100:
         self._device: I2CDevice = I2CDevice(i2c, address)
 
         # Initialize register page classes
-        self._page0: "_Page0Registers" = _Page0Registers(self._device)
-        self._page1: "_Page1Registers" = _Page1Registers(self._device)
-        self._page3: "_Page3Registers" = _Page3Registers(self._device)
+        self._page0: _Page0Registers = _Page0Registers(self._device)
+        self._page1: _Page1Registers = _Page1Registers(self._device)
+        self._page3: _Page3Registers = _Page3Registers(self._device)
         self._sample_rate: int = 44100
         self._bit_depth: int = 16
         self._mclk_freq: int = 0  # Default to BCLK
@@ -1559,7 +1554,7 @@ class TLV320DAC3100:
         :return: Volume in dB
         """
         if reg_val & 0x80:
-            reg_val = reg_val - 256
+            reg_val -= 256
 
         return reg_val * 0.5
 
