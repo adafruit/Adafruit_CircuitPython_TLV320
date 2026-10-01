@@ -114,7 +114,7 @@ very good audio quality (at limited bandwidth) using 8 kHz WAV file samples.
 
 ::
 
-    sample_rate = 8000  # can also use 11025, 22050, 44100, or 48000
+    sample_rate = 8000  # can also use 11025, 22050, 32000, 44100, or 48000
 
     # 1. Begin sending the MCLK PWM clock signal
     mclk_out = pwmio.PWMOut(board.I2S_MCLK, frequency=15_000_000, duty_cycle=2**15)
@@ -902,13 +902,15 @@ class _Page0Registers(_PagedRegisterBase):
                 p, r, j, d, ndac, mdac, dosr = 5, 1, 35, 7504, 19, 1, 512
             elif sample_rate == 22050:
                 p, r, j, d, ndac, mdac, dosr = 5, 1, 35, 7504, 19, 1, 256
+            elif sample_rate == 32000:
+                p, r, j, d, ndac, mdac, dosr = 1, 1, 6, 5536, 24, 1, 128
             elif sample_rate == 44100:
                 p, r, j, d, ndac, mdac, dosr = 5, 1, 35, 7504, 19, 1, 128
             elif sample_rate == 48000:
                 p, r, j, d, ndac, mdac, dosr = 1, 1, 6, 9632, 17, 1, 128
             else:
                 raise ValueError(
-                    "Need a valid MCLK sample rate: 8000, 11025, 22050, 44100, or 48000"
+                    "Need a valid MCLK sample rate: 8000, 11025, 22050, 32000, 44100, or 48000"
                 )
 
         else:
@@ -2154,8 +2156,9 @@ class TLV320DAC3100:
         dividers, and interface settings to achieve the requested sample rate.
 
         :param sample_rate: The desired sample rate in Hz. Supported sample
-            rates are 8000, 11025, 22050, 44100, and 48000. But, to get good
-            quality at low sample rates, you need to use MCLK instead of BCLK.
+            rates are 8000, 11025, 22050, 44100, and 48000. With MCLK,
+            32000 is also supported. But, to get good quality at low sample
+            rates, you need to use MCLK instead of BCLK.
         :param bit_depth: The bit depth (16). CircuitPython I2S always sends
             16-bit stereo, so set this to 16.
         :param mclk_freq: The main clock (MCLK) frequency (None or 15_000_000).
